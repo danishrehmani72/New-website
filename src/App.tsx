@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AvatarIcon, getAvatarConfig } from './lib/avatars';
 import earnhubLogo from './assets/images/earnhub_logo_1780161493423.png';
 import { playSound } from './lib/sounds';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { 
   ArrowDownLeft, 
   ArrowUpRight, 
@@ -2847,6 +2848,9 @@ export default function App() {
       </AnimatePresence>
 
       {/* Gmail Link & Verification Modal Prompt */}
+      
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
       <AnimatePresence>
       </AnimatePresence>
     </div>
