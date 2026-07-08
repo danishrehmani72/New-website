@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AvatarIcon, getAvatarConfig } from './lib/avatars';
 import earnhubLogo from './assets/images/earnhub_logo_1780161493423.png';
 import { playSound } from './lib/sounds';
+import { Analytics } from '@vercel/analytics/react';
 import { 
   ArrowDownLeft, 
   ArrowUpRight, 
@@ -2849,6 +2850,9 @@ export default function App() {
       {/* Gmail Link & Verification Modal Prompt */}
       <AnimatePresence>
       </AnimatePresence>
+      
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
