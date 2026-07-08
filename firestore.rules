@@ -1,0 +1,217 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ----------------- SUBCOLLECTION COLLECTION GROUPS -----------------
+    // Support Admin Panel collection group queries securely with Zero-Trust constraints
+    match /{path=**}/deposits/{depositId} {
+      allow read, list: if true;
+      allow write: if request.auth != null;
+    }
+    match /{path=**}/withdrawals/{withdrawalId} {
+      allow read, list: if true;
+      allow write: if request.auth != null;
+    }
+    match /{path=**}/investments/{investmentId} {
+      allow read, list: if true;
+      allow write: if request.auth != null;
+    }
+    match /{path=**}/referrals/{referralId} {
+      allow read, list, write: if request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\- .@]+$');
+    }
+
+    // Helper to validate User schema (requires userId and name, others optional to prevent legacy data lockouts)
+    function isValidUser(user, userId) {
+      return user.keys().hasAll(['userId', 'name'])
+        && user.keys().size() <= 30
+        && user.userId is string
+        && user.userId == userId
+        && user.name is string
+        && user.name.size() >= 2
+        && user.name.size() <= 100
+        && (!user.keys().hasAny(['avatar']) || (user.avatar is string && user.avatar.size() <= 128))
+        && (!user.keys().hasAny(['signupBonus']) || (user.signupBonus is number))
+        && (!user.keys().hasAny(['blocked']) || (user.blocked is bool))
+        && (!user.keys().hasAny(['lastClaimedAt']) || (user.lastClaimedAt is string && user.lastClaimedAt.size() <= 64))
+        && (!user.keys().hasAny(['claimStreak']) || (user.claimStreak is number))
+        && (!user.keys().hasAny(['dailyBonusEarnings']) || (user.dailyBonusEarnings is number))
+        && (!user.keys().hasAny(['referredBy']) || (user.referredBy == null || user.referredBy is string))
+        && (!user.keys().hasAny(['user_id']) || (user.user_id is string && user.user_id.size() <= 128))
+        && (!user.keys().hasAny(['full_name']) || (user.full_name is string && user.full_name.size() <= 128))
+        && (!user.keys().hasAny(['password']) || (user.password is string && user.password.size() <= 128))
+        && (!user.keys().hasAny(['security_pin']) || (user.security_pin is string && user.security_pin.size() <= 16));
+    }
+
+    // Helper to validate DailyReward log schema
+    function isValidDailyReward(log) {
+      return log.keys().hasAll(['id', 'amount', 'streak', 'timestamp', 'createdAt'])
+        && log.keys().size() <= 6
+        && log.id is string
+        && log.id.size() <= 128
+        && log.amount is number
+        && log.streak is number
+        && log.timestamp is string
+        && log.timestamp.size() <= 64;
+    }
+
+    function isValidTask(task) {
+      return task.keys().hasAll(['id', 'title', 'platform', 'link', 'reward', 'status'])
+        && task.id is string
+        && task.title is string
+        && task.platform in ['YouTube', 'TikTok', 'Facebook']
+        && task.link is string
+        && task.reward is number
+        && task.status in ['Active', 'Inactive'];
+    }
+
+    function isValidTaskSubmission(sub) {
+      return sub.keys().hasAll(['id', 'userId', 'taskId', 'screenshot', 'status', 'submissionTime'])
+        && sub.id is string
+        && sub.userId is string
+        && sub.taskId is string
+        && sub.screenshot is string
+        && sub.status in ['Pending', 'Approved', 'Rejected']
+        && sub.submissionTime is string;
+    }
+
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'danishrehmani72@gmail.com' ||
+        request.auth.token.email == 'admin@gmail.com' ||
+        request.auth.uid == 'adminmoneymind'
+      );
+    }
+
+    // ----------------- TASKS ROOT COLLECTION -----------------
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ----------------- TASK SUBMISSIONS ROOT COLLECTION -----------------
+    match /task_submissions/{submissionId} {
+      allow list, get: if request.auth != null && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow create: if request.auth != null && isValidTaskSubmission(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Helper to validate ReferralLog schema representing a referral commission
+    function isValidReferralLog(log) {
+      return log.keys().hasAll(['id', 'timestamp', 'amount', 'refereeId', 'refereeName', 'createdAt'])
+        && log.keys().size() <= 12
+        && log.id is string
+        && log.id.size() <= 128
+        && log.timestamp is string
+        && log.timestamp.size() <= 100
+        && log.amount is number
+        && log.amount >= 0
+        && log.amount <= 1000
+        && log.refereeId is string
+        && log.refereeId.size() <= 128
+        && log.refereeName is string
+        && log.refereeName.size() >= 1
+        && log.refereeName.size() <= 100
+        && (!log.keys().hasAny(['refereeAvatar']) || (log.refereeAvatar is string && log.refereeAvatar.size() <= 128))
+        && (!log.keys().hasAny(['source']) || (log.source is string && log.source.size() <= 128))
+        && (!log.keys().hasAny(['level']) || (log.level is number))
+        && (!log.keys().hasAny(['referredBy']) || (log.referredBy is string && log.referredBy.size() <= 128))
+        && (!log.keys().hasAny(['referrerName']) || (log.referrerName is string && log.referrerName.size() <= 100));
+    }
+
+    // ----------------- USERS COLLECTION -----------------
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if true;
+      
+      allow create: if isValidId(userId) 
+        && isValidUser(request.resource.data, userId);
+
+      allow update: if isValidId(userId) 
+        && isValidUser(request.resource.data, userId)
+        && (!resource.data.keys().hasAll(['createdAt']) || request.resource.data.createdAt == resource.data.createdAt); // createdAt is immortal of users
+
+      allow delete: if isValidId(userId); // Profiles can be deleted for resets
+
+      // ----------------- SECRETS SUBCOLLECTION -----------------
+      match /secrets/auth {
+        allow get, create, update, delete: if isValidId(userId);
+      }
+
+      // ----------------- REFERRALS SUBCOLLECTION -----------------
+      match /referrals/{referralId} {
+        allow list, get: if isValidId(userId);
+
+        allow create: if isValidId(userId)
+          && isValidId(referralId)
+          && isValidReferralLog(request.resource.data);
+
+        allow update, delete: if isValidId(userId); // Allow resets and deletions
+      }
+
+      // ----------------- DEPOSITS SUBCOLLECTION -----------------
+      match /deposits/{depositId} {
+        allow get, list: if true;
+        allow create, update, delete: if isValidId(userId) && isValidId(depositId);
+      }
+
+      // ----------------- WITHDRAWALS SUBCOLLECTION -----------------
+      match /withdrawals/{withdrawalId} {
+        allow get, list: if true;
+        allow create, update, delete: if isValidId(userId) && isValidId(withdrawalId);
+      }
+
+      // ----------------- INVESTMENTS SUBCOLLECTION -----------------
+      match /investments/{investmentId} {
+        allow get, list: if true;
+        allow create, update, delete: if isValidId(userId) && isValidId(investmentId);
+      }
+
+      // ----------------- BALANCE LOGS SUBCOLLECTION -----------------
+      match /balance_logs/{logId} {
+        allow get: if isValidId(userId) && isValidId(logId);
+        allow list: if isValidId(userId);
+        allow create: if isValidId(userId) && isValidId(logId);
+        allow update, delete: if isValidId(userId) && isValidId(logId);
+      }
+
+      // ----------------- DAILY REWARDS SUBCOLLECTION -----------------
+      match /daily_rewards/{rewardId} {
+        allow get: if isValidId(userId) && isValidId(rewardId);
+        allow list: if isValidId(userId);
+        allow create: if isValidId(userId) && isValidId(rewardId) && isValidDailyReward(request.resource.data);
+        allow update, delete: if isValidId(userId) && isValidId(rewardId);
+      }
+    }
+
+    // ----------------- AUDIT LOGS ROOT COLLECTION -----------------
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId);
+      allow list: if true;
+      allow create, update, delete: if isValidId(logId);
+    }
+
+    // ----------------- SECURITY LOGS ROOT COLLECTION -----------------
+    match /security_logs/{logId} {
+      allow get: if isValidId(logId);
+      allow list: if true;
+      allow create, update, delete: if isValidId(logId);
+    }
+
+    // ----------------- EMAIL LOGS ROOT COLLECTION -----------------
+    match /email_logs/{logId} {
+      allow get: if isValidId(logId);
+      allow list: if true;
+      allow create, update, delete: if isValidId(logId);
+    }
+  }
+}

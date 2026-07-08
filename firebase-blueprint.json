@@ -1,0 +1,227 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Premium user profile containing identity, current balance, and stats.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Moniker of the chosen badge avatar."
+        },
+        "signupBonus": {
+          "type": "number",
+          "description": "Starting USD bonus credential."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user account was initiated."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the profile was last modified."
+        },
+        "blocked": {
+          "type": "boolean",
+          "description": "True if the user's account has been administratively suspended."
+        },
+        "isSuspicious": {
+          "type": "boolean",
+          "description": "True if flagged for suspected duplicate behavior or referral abuse."
+        },
+        "ipAddress": {
+          "type": "string",
+          "description": "Last recorded sign-up or sign-in IP address."
+        },
+        "deviceFingerprint": {
+          "type": "string",
+          "description": "Device hardware and browser capabilities seed fingerprint hash."
+        },
+        "browserInfo": {
+          "type": "string",
+          "description": "Browser details and HTTP User Agent signature."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the registered member."
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Whether the email was verified with verification code."
+        },
+        "lastClaimedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the user's last daily check-in."
+        },
+        "claimStreak": {
+          "type": "number",
+          "description": "Consecutive days the user has claimed staking yields."
+        },
+        "dailyBonusEarnings": {
+          "type": "number",
+          "description": "Cumulative earnings claimed from check-in yields."
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Lowercase user ID for database matching."
+        },
+        "full_name": {
+          "type": "string",
+          "description": "Full name in lowercase or standard format used for DB matching."
+        },
+        "password": {
+          "type": "string",
+          "description": "Plaintext key or hashed key for authorization fallback check."
+        },
+        "security_pin": {
+          "type": "string",
+          "description": "4-Digit security PIN used for resetting access credentials."
+        }
+      },
+      "required": ["userId", "name", "createdAt", "updatedAt"]
+    },
+    "ReferralLog": {
+      "title": "Referral Activity Log",
+      "description": "Individual commission event generated when another member joins via referral.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction ID of the referral."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "User-friendly date and time of the event."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Earnings from the referral event (usually 10)."
+        },
+        "refereeName": {
+          "type": "string",
+          "description": "First name or full name of the newly onboarded referee member."
+        },
+        "refereeId": {
+          "type": "string",
+          "description": "User ID of the newly onboarded user."
+        },
+        "source": {
+          "type": "string",
+          "description": "Tracking source campaign moniker used during sign-up."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Audit control server-side timestamp of write."
+        }
+      },
+      "required": ["id", "timestamp", "amount", "refereeId", "refereeName", "createdAt"]
+    },
+    "DailyReward": {
+      "title": "Daily Dividend Claim Record",
+      "description": "Log of successful daily division claim with timing, amount, and current streak.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the claim log."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount claimed in USD."
+        },
+        "streak": {
+          "type": "number",
+          "description": "Streak day of the claim."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp of the claim."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-side creation timestamp identifier."
+        }
+      },
+      "required": ["id", "amount", "streak", "timestamp", "createdAt"]
+    },
+    "Task": {
+      "title": "Social Media Task",
+      "description": "A task created by admin for users to complete on social media platforms.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "platform": { "type": "string", "enum": ["YouTube", "TikTok", "Facebook"] },
+        "link": { "type": "string" },
+        "reward": { "type": "number" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "platform", "link", "reward", "status"]
+    },
+    "TaskSubmission": {
+      "title": "Task Submission",
+      "description": "A user's submission for a social media task with screenshot verification.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "taskId": { "type": "string" },
+        "taskTitle": { "type": "string" },
+        "platform": { "type": "string" },
+        "reward": { "type": "number" },
+        "screenshot": { "type": "string", "description": "Base64 encoded image or storage URL." },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "submissionTime": { "type": "string", "format": "date-time" },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "reviewedBy": { "type": "string" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["id", "userId", "taskId", "screenshot", "status", "submissionTime"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Social media tasks managed by admin."
+    },
+    "/task_submissions/{submissionId}": {
+      "schema": "TaskSubmission",
+      "description": "User task completions awaiting review."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual premium member dashboard configurations and balances."
+    },
+    "/users/{userId}/referrals/{referralId}": {
+      "schema": "ReferralLog",
+      "description": "Specific commissions settled for a user."
+    },
+    "/users/{userId}/daily_rewards/{rewardId}": {
+      "schema": "DailyReward",
+      "description": "Logs of daily rewards claimed by this user."
+    },
+    "/audit_logs/{logId}": {
+      "description": "Administrative historical trailing ledger recorded on cloud nodes."
+    },
+    "/security_logs/{logId}": {
+      "description": "Security and fraud detection activity logs tracked dynamically by the system."
+    }
+  }
+}

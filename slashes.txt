@@ -1,0 +1,333 @@
+1:/**
+4: */
+8:import { motion, AnimatePresence } from 'motion/react';
+9:import CodeModal from './CodeModal';
+10:import earnhubLogo from '../assets/images/earnhub_logo_1780161493423.png';
+11:import { db } from '../lib/firebase';
+12:import { doc, setDoc, serverTimestamp, getDoc, collection, getDocFromServer, query, where, getDocs } from 'firebase/firestore';
+27:          // fallback to standard delay or error propagation
+54:  // Recovery/PIN State attributes
+59:  // Custom states for 4-Digit Security PIN & Reset Modal
+69:  // 1. Store and track User IP, Device Fingerprint, Browser info, Email verification & Captcha states
+86:  // Regenerate secure verification Captcha
+109:      const response = await fetch('/api/send-otp', {
+112:          'Content-Type': 'application/json',
+171:  // Dynamic IP hook on assembly mount
+172:  const [clientIp, setClientIp] = useState('192.168.1.100'); // secure local default
+177:        const res = await fetch('https://api.ipify.org?format=json');
+190:  // Secure canvas/UUID device fingerprinting identifier
+208:  // Process Signup Form Submission
+212:    // Validations
+221:    if (!/^[a-zA-Z0-9_\-.@]+$/.test(userId.trim())) {
+247:    // Local registration rate limit
+250:      setError(`Registration rate limit exceeded. Please wait ${Math.ceil((30 * 1000 - (Date.now() - parseInt(lastReg))) / 1000)} seconds before trying again.`);
+262:      // 1. Check if the User profile document already exists in Firestore to prevent collision
+271:      // Check if email already exists
+280:      // Compute current device fingerprint
+283:      // Check 24 hour IP registration count for rate-limiting
+284:      // "If more than 3 accounts are created from the same IP address within 24 hours, block further registrations."
+303:        // Save security rate limit log
+323:      // Check if device fingerprint is banned 
+324:      // "Prevent banned devices from creating new accounts."
+334:        // Log banned device attempt
+342:          description: `Registration blocked: Banned device/fingerprint ${currentFingerprint} tried to register new account.`,
+354:      // Check multi account count on this device:
+355:      // "If more than 2 accounts are created from the same device fingerprint, automatically mark them as suspicious AND Auto-Ban them"
+362:        shouldAutoBan = true; // Auto Ban duplicate accounts!
+365:      // Determine signup bonus: standard is $0.10, but if referred by a valid user, they get $0.30 (invitee bonus)
+380:            // Referral fraud: Do not allow referral rewards if on same device
+383:              isReferralValid = false; // Disallow referrer reward and invitee bonus!
+384:              signupBonusAmount = 0.10; // Reset signup bonus to standard
+386:              // Log direct referral fraud alert
+402:            // Referral fraud: Flag accounts that use same IP and same referral code repeatedly
+410:                // Log repeated IP referral alert
+432:      // If auto banned, log multiple accounts check
+448:        // Set previous profiles on this device to suspicious
+462:      // Save registration time rate limit
+465:      // 2. Store full profile database record in Firestore under the custom User ID
+468:        user_id: cleanUserId, // lowercase DB key
+470:        full_name: cleanName, // lowercase DB key
+483:        password: password, // lowercase DB key
+484:        security_pin: "0000", // lowercase DB key
+487:      // 3. Store authentication credentials securely in the private secrets subcollection doc
+495:      // 4. Handle conversion ledger event if user joined via valid referrer invite link
+509:          // Level 1 Reward ($0.055)
+524:          // Fetch Level 1 parent elements to check for Level 2 Parent
+529:            const parent2Id = parent1Data.referredBy; // Level 2 Parent
+535:                // Level 2 Reward ($0.033)
+551:                const parent3Id = parent2Data.referredBy; // Level 3 Parent
+557:                    // Level 3 Reward ($0.011)
+581:      // 5. Highlight beautiful feedback and transition to login box
+587:        setPassword(''); // Clear security fields
+597:  // Process Login Form Submission
+617:      // 1. Fetch user profile
+626:      // 2. Fetch secure credentials check to authenticate custom login session
+658:  // Process Forgot/Recovery Form submission
+665:    // Dynamic recovery execution
+672:        setError('Please enter your 4-6 digit Recovery PIN/Code.');
+706:          setUserId(foundUid); // Prefill Sign In input with the discovered user ID
+708:          setError('❌ Invalid Recovery PIN/Code for this member name.');
+717:      // Reset Password
+723:        setError('Please enter your Recovery PIN/Code.');
+746:          setError('❌ Verification failed. Invalid Recovery PIN/Code.');
+751:        // Recovery matches, update password!
+754:          recoveryCode: recoveryCode.trim() // preserve existing pin
+774:  // Dedicated handshaker for Reset Password of forget popup modal
+803:      // 1. Verify existence in db
+815:      // Update password and set security_pin to "0000" in both places for high availability
+832:        // Clear reset states
+839:        // Switch main screen to login
+860:      className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#0B0B0B] via-[#050505] to-black border-2 border-[#D4AF37]/45 hover:border-[#10B981]/60 shadow-[0_0_40px_rgba(212,175,55,0.12)] hover:shadow-[0_0_55px_rgba(16,185,129,0.18)] transition-all duration-500 p-6 md:p-8 space-y-7 max-w-md w-full backdrop-blur-xl animate-fade-in"
+862:      {/* Premium gold particle overlay gradients */}
+863:      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-[#D4AF37]/8 via-[#10B981]/4 to-transparent blur-3xl pointer-events-none" />
+864:      <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-[#D4AF37]/5 blur-3xl pointer-events-none" />
+866:      {/* Header section with brand logo */}
+871:          className="w-16 h-16 mx-auto object-contain rounded-2xl border-2 border-[#D4AF37]/40 ring-1 ring-[#D4AF37]/15 shadow-[0_0_20px_rgba(212,175,55,0.15)] bg-black mb-3"
+873:        />
+876:            <>Join <span className="text-[#D4AF37] animate-pulse">MoneyMind Space</span></>
+878:            <>Welcome to <span className="text-[#D4AF37] animate-pulse">MoneyMind Space</span></>
+880:            <>Account <span className="text-[#D4AF37] animate-pulse">Security Recovery</span></>
+882:        </h2>
+883:        <p className="text-[11px] text-white/50 leading-relaxed font-sans max-w-xs mx-auto">
+889:        </p>
+890:      </div>
+892:      {/* Dynamic Tabs/Toggles with custom state styling */}
+894:        <div className="grid grid-cols-2 gap-1.5 bg-black/80 p-1.5 rounded-2xl border border-[#D4AF37]/30 shadow-inner shadow-black relative z-10">
+905:                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.02]'
+909:          </button>
+920:                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.02]'
+924:          </button>
+925:        </div>
+927:        <div className="grid grid-cols-3 gap-1 bg-black/80 p-1.5 rounded-2xl border border-[#D4AF37]/35 shadow-inner shadow-black relative z-10">
+939:                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.02]'
+943:          </button>
+955:                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.02]'
+959:          </button>
+971:                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.02]'
+975:          </button>
+976:        </div>
+980:        {/* User ID Field */}
+984:              <span className="text-sm">👤</span>
+985:              <label htmlFor="userid-input" className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+987:              </label>
+988:            </div>
+996:                  const cleanVal = e.target.value.replace(/\s+/g, '');
+1000:                className="w-full bg-black/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 select-all outline-none focus:border-[#D4AF37]/60 focus:ring-1 focus:ring-[#D4AF37]/20 transition-all rounded-xl shadow-inner shadow-black"
+1001:              />
+1002:            </div>
+1004:              <p className="mt-1 text-[8.5px] text-white/30 font-medium tracking-wide">Your User ID is your secure login key: <span className="text-[#D4AF37]/80 font-mono font-bold">{userId ? userId : 'id'}</span></p>
+1006:          </div>
+1009:        {/* Full Name Field (Signup or recovering User ID) */}
+1020:                <span className="text-sm">📝</span>
+1021:                <label htmlFor="name-input" className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+1023:                </label>
+1024:              </div>
+1034:                className="w-full bg-black/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 select-all outline-none focus:border-[#D4AF37]/60 focus:ring-1 focus:ring-[#D4AF37]/20 transition-all rounded-xl shadow-inner shadow-black"
+1035:              />
+1036:            </motion.div>
+1038:        </AnimatePresence>
+1040:        {/* Secure Password Field */}
+1044:              <span className="text-xs">🔑</span>
+1045:              <label htmlFor="password-input" className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+1047:              </label>
+1048:            </div>
+1059:                className="w-full bg-black/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 select-all outline-none focus:border-[#D4AF37]/60 focus:ring-1 focus:ring-[#D4AF37]/20 transition-all rounded-xl shadow-inner shadow-black"
+1060:              />
+1061:            </div>
+1062:          </div>
+1065:        {/* Security PIN / Recovery Code (Forgot PIN checks) */}
+1077:                  <span className="text-xs">🔐</span>
+1078:                  <label htmlFor="recovery-pin-input" className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+1079:                    {mode === 'signup' ? '4-Digit Security PIN' : 'Recovery PIN / Code'}
+1080:                  </label>
+1081:                </div>
+1090:                      const cleaned = e.target.value.replace(/\D/g, '');
+1094:                    className="w-full bg-black/80 border border-white/10 rounded-xl p-3.5 pr-20 text-xs text-white placeholder-white/25 select-all outline-none focus:border-[#D4AF37]/60 focus:ring-1 focus:ring-[#D4AF37]/20 transition-all rounded-xl shadow-inner shadow-black font-mono tracking-widest text-center"
+1095:                  />
+1104:                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-extrabold text-[#D4AF37] uppercase tracking-wider bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/35 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+1107:                    </button>
+1109:                </div>
+1110:              </div>
+1115:                    <span className="text-xs">🔒</span>
+1116:                    <label htmlFor="confirm-pin-input" className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+1118:                    </label>
+1119:                  </div>
+1127:                      const cleaned = e.target.value.replace(/\D/g, '');
+1131:                    className="w-full bg-black/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 outline-none focus:border-[#D4AF37]/60 focus:ring-1 focus:ring-[#D4AF37]/20 transition-all rounded-xl shadow-inner shadow-black font-mono tracking-widest text-center"
+1132:                  />
+1134:                  {/* Gorgeous golden English informational warning note */}
+1135:                  <div className="mt-2.5 p-3.5 bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/30 rounded-2xl text-left animate-fade-in">
+1137:                      <span className="text-sm select-none">⚠️</span>
+1138:                      <span>Remember your 4-Digit Security PIN.</span>
+1139:                    </p>
+1140:                    <p className="text-[10px] text-white/60 leading-relaxed font-sans mt-0.5">
+1142:                    </p>
+1143:                  </div>
+1144:                </div>
+1146:            </motion.div>
+1148:        </AnimatePresence>
+1150:        {/* Manual Recovery Help Block */}
+1155:            className="p-4 bg-gradient-to-b from-zinc-900 via-black to-[#0A0A0A] rounded-2xl border border-white/10 text-left space-y-4 relative z-20"
+1157:            <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+1158:              <span className="text-sm select-none">📧</span>
+1161:              </h4>
+1162:            </div>
+1164:            <p className="text-[10.5px] text-white/70 leading-relaxed font-sans">
+1165:              Did you register before the PIN update, or forgot your Recovery PIN/Code? Please reach out to our official help center at <span className="text-[#D4AF37] font-semibold text-xs leading-none">support@moneymindspace.online</span>. Our compliance and support team will verify your balance logs and securely reset your credentials.
+1166:            </p>
+1168:            <div className="space-y-2 text-[10px] bg-black/40 p-3 rounded-xl border border-white/5 font-mono">
+1169:              <p className="text-white/40 uppercase text-[8.5px] font-black tracking-widest">📋 Verification Requirements:</p>
+1170:              <div className="flex gap-2 text-white/70">
+1171:                <span className="text-[#D4AF37] font-bold">1.</span>
+1172:                <span>The exact **Full Name** registered to your profile</span>
+1173:              </div>
+1174:              <div className="flex gap-2 text-white/70">
+1175:                <span className="text-[#D4AF37] font-bold">2.</span>
+1176:                <span>The approximate **Account Balance** or plan tier</span>
+1177:              </div>
+1178:              <div className="flex gap-2 text-white/70">
+1179:                <span className="text-[#D4AF37] font-bold">3.</span>
+1180:                <span>Any screenshot or text record of deposit transactions</span>
+1181:              </div>
+1182:            </div>
+1189:                <span>Email Secure Support Desk</span>
+1190:                <span className="bg-black/10 px-1.5 py-0.5 rounded text-[8.5px] text-black/85">support@moneymindspace.online</span>
+1191:              </a>
+1192:            </div>
+1193:          </motion.div>
+1196:        {/* Anti-Fraud Email and CAPTCHA registration modules */}
+1198:          <div className="space-y-4 border-t border-white/5 pt-4">
+1199:            {/* Email Verification Section */}
+1202:                <span className="text-sm">📧</span>
+1203:                <label className="block text-[9px] font-black text-white/70 uppercase tracking-widest">
+1205:                </label>
+1206:              </div>
+1217:                  className="flex-1 bg-black/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 outline-none focus:border-[#D4AF37]/60 transition-all shadow-inner disabled:opacity-50"
+1218:                />
+1223:                  className="px-3 py-1 bg-[#D4AF37] hover:bg-[#c39e2e] disabled:bg-white/5 disabled:text-white/20 text-black text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-[#D4AF37]/10"
+1226:                </button>
+1227:              </div>
+1236:                    const val = e.target.value.replace(/\D/g, '');
+1240:                  className="flex-1 text-center bg-black border border-white/10 rounded-xl p-2 font-mono text-xs tracking-widest text-[#D4AF37] focus:border-[#D4AF37]/50 outline-none"
+1241:                />
+1248:                </button>
+1249:              </div>
+1253:                  <span>✔</span>
+1254:                  <span>Email address verified successfully.</span>
+1255:                </p>
+1257:            </div>
+1259:            {/* Google reCAPTCHA Verification Module */}
+1260:            <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+1267:                    className="w-6 h-6 rounded border border-white/20 bg-black/80 flex items-center justify-center transition-all cursor-pointer hover:border-[#D4AF37]/50 active:scale-95 disabled:hover:border-white/20 select-none animate-none"
+1270:                  </button>
+1271:                  <span className="text-[11px] font-bold text-white/80 font-sans tracking-wide">
+1273:                  </span>
+1274:                </div>
+1278:                  </div>
+1279:                  <span className="text-[6.5px] text-white/35 uppercase tracking-widest mt-1.5 font-sans font-black">reCAPTCHA</span>
+1280:                </div>
+1281:              </div>
+1283:            </div>
+1285:        {/* Feedback Messages */}
+1287:           <div className="mt-2 p-2 bg-black border border-[#D4AF37]/30 rounded-lg text-[#D4AF37] font-mono text-[10px] text-center">
+1289:           </div>
+1292:          <p className="text-[10px] font-semibold text-rose-500 leading-relaxed font-mono flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg">
+1293:            <span>⚠️ Error:</span>
+1294:            <span>{error}</span>
+1295:          </p>
+1299:          <p className="text-[10.5px] font-extrabold text-[#10B981] leading-relaxed font-mono flex items-center gap-1.5 bg-[#10B981]/10 border border-[#10B981]/20 p-2.5 rounded-lg select-all animate-bounce">
+1300:            <span>✅ Success:</span>
+1301:            <span>{successMsg}</span>
+1302:          </p>
+1305:        {/* Retrieve ID Result Panel */}
+1310:            className="p-4 bg-gradient-to-r from-[#D4AF37]/15 to-[#10B981]/15 rounded-2xl border-2 border-[#D4AF37]/50 text-center space-y-2 select-all relative z-20"
+1312:            <p className="text-[10px] uppercase tracking-widest text-[#D4AF37] font-black">Account Located Successfully</p>
+1313:            <div className="text-xs font-black text-white font-mono flex items-center justify-center gap-1.5 bg-black/85 py-2.5 px-3 rounded-xl border border-white/10 select-all">
+1314:              🔑 User ID: <span className="text-emerald-400 text-base font-bold select-all">{recoveryFoundId}</span>
+1315:            </div>
+1316:            <p className="text-[9px] text-white/50 font-medium">Use this User ID and your registered password to sign in directly.</p>
+1317:          </motion.div>
+1320:        {/* Submit Actions */}
+1329:                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+1330:                <span>Processing Onboard...</span>
+1331:              </>
+1334:                <Sparkles className="w-4 h-4" />
+1335:                <span>🚀 Sign Up & Onboard</span>
+1336:              </>
+1339:                <LogIn className="w-4 h-4" />
+1340:                <span>🔑 Sign In directly</span>
+1341:              </>
+1344:                <UserCheck className="w-4 h-4" />
+1345:                <span>🔍 Find Member User ID</span>
+1346:              </>
+1349:                <Key className="w-4 h-4" />
+1350:                <span>🔒 Reset Password</span>
+1351:              </>
+1353:          </button>
+1369:              className="text-[11px] text-[#24A1DE] hover:text-[#24A1DE]/80 font-black uppercase tracking-wider transition-all cursor-pointer hover:underline"
+1372:            </button>
+1373:          </div>
+1375:      {/* Alternative View triggers */}
+1385:            className="text-[9.5px] text-white/50 uppercase tracking-widest font-black hover:text-[#D4AF37] transition-all cursor-pointer underline decoration-[#D4AF37]/35 decoration-2"
+1388:          </button>
+1397:            className="text-[9.5px] text-white/50 uppercase tracking-widest font-black hover:text-[#D4AF37] transition-all cursor-pointer underline decoration-[#D4AF37]/35 decoration-2"
+1400:          </button>
+1412:            <ChevronLeft className="w-3.5 h-3.5" />
+1413:            <span>Back to Sign In</span>
+1414:          </button>
+1416:      </div>
+1418:      <div className="pt-5 border-t border-white/5 space-y-4 text-left relative z-10 font-sans">
+1419:        <div className="flex items-start gap-3 bg-white/[0.01] border border-white/5 p-3.5 rounded-2xl">
+1420:          <div className="p-1.5 rounded bg-[#D4AF37]/10 text-[#D4AF37] mt-0.5 border border-[#D4AF37]/20 shrink-0">
+1421:            <TrendingUp className="w-3.5 h-3.5" />
+1422:          </div>
+1424:            <h4 className="text-[10px] font-black text-white/90 uppercase tracking-widest">Elite Distribution Model</h4>
+1425:            <p className="text-[10px] text-white/45 leading-relaxed mt-1 font-medium">
+1427:            </p>
+1428:          </div>
+1429:        </div>
+1430:        <div className="flex items-start gap-3 bg-white/[0.01] border border-white/5 p-3.5 rounded-2xl">
+1431:          <div className="p-1.5 rounded bg-[#10B981]/10 text-[#10B981] mt-0.5 border border-[#10B981]/20 shrink-0">
+1432:            <UserCheck className="w-3.5 h-3.5" />
+1433:          </div>
+1435:            <h4 className="text-[10px] font-black text-white/90 uppercase tracking-widest">Firebase Account Authentication</h4>
+1436:            <p className="text-[10px] text-white/45 leading-relaxed mt-1 font-medium">
+1438:            </p>
+1439:          </div>
+1440:        </div>
+1441:        <div className="flex items-start gap-3 bg-[#24A1DE]/5 border border-[#24A1DE]/20 p-3.5 rounded-2xl hover:border-[#24A1DE]/40 transition-[border-color] duration-300">
+1442:          <div className="p-1.5 rounded bg-[#24A1DE]/10 text-[#24A1DE] mt-0.5 border border-[#24A1DE]/25 shrink-0">
+1443:            <span className="text-[11px] leading-none select-none">📢</span>
+1444:          </div>
+1446:            <h4 className="text-[10px] font-black text-white/90 uppercase tracking-widest flex items-center justify-between gap-2 flex-wrap">
+1447:              <span>Official Telegram Community</span>
+1448:              <span className="text-[7.5px] bg-[#24A1DE]/15 text-[#24A1DE] font-bold px-1.5 py-0.5 rounded border border-[#24A1DE]/30 uppercase tracking-wider">Join Group</span>
+1449:            </h4>
+1450:            <p className="text-[10px] text-white/45 leading-relaxed mt-1 font-medium">
+1451:              Join our public channel at <a href="https://t.me/moneymindonlineearningspace" target="_blank" rel="noopener noreferrer" className="text-[#24A1DE] font-extrabold hover:underline">t.me/moneymindonlineearningspace</a> representing <span className="text-[#D4AF37] font-semibold">Moneymindspace.online</span> today! Exchange payment receipts and claim staking updates.
+1452:            </p>
+1453:          </div>
+1454:        </div>
+1455:        <div className="flex items-start gap-3 bg-[#D4AF37]/5 border border-[#D4AF37]/20 p-3.5 rounded-2xl hover:border-[#D4AF37]/45 transition-[border-color] duration-300">
+1456:          <div className="p-1.5 rounded bg-[#D4AF37]/10 text-[#D4AF37] mt-0.5 border border-[#D4AF37]/25 shrink-0">
+1457:            <span className="text-[11px] leading-none select-none">📧</span>
+1458:          </div>
+1460:            <h4 className="text-[10px] font-black text-white/90 uppercase tracking-widest flex items-center justify-between gap-2 flex-wrap">
+1461:              <span>Secure Support Desk</span>
+1462:              <span className="text-[7.5px] bg-[#D4AF37]/15 text-[#D4AF37] font-bold px-1.5 py-0.5 rounded border border-[#D4AF37]/35 uppercase tracking-wider">Email Help Desk</span>
+1463:            </h4>
+1464:            <p className="text-[10px] text-white/45 leading-relaxed mt-1 font-medium">
+1465:              Have persistent queries, setup issues, or login failures? Email our security team directly at <a href="mailto:support@moneymindspace.online" className="text-[#D4AF37] font-extrabold hover:underline">support@moneymindspace.online</a> for priority assistance.
+1466:            </p>
+1467:          </div>
+1468:        </div>
+1469:      </div>
+1470:    </div>
+1471:      </form>
+1473:    {/*
+1476:        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+1478:        </div>
+1480:    </AnimatePresence>
+1481:    */}
+1482:  </motion.div>
+1483:  </>

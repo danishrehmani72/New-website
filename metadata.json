@@ -1,0 +1,8 @@
+{
+  "name": "MoneyMind Space",
+  "description": "Join MoneyMind Space to track earnings, manage investments, and build a stronger financial future with confidence and security.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

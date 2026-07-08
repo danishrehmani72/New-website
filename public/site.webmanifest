@@ -1,0 +1,17 @@
+{
+  "name": "MoneyMind Space",
+  "short_name": "MoneyMind",
+  "description": "Join MoneyMind Space to track earnings, manage investments, and build a stronger financial future with confidence and security.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0C0C0C",
+  "theme_color": "#D4AF37",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
