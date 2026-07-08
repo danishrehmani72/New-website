@@ -2440,7 +2440,9 @@ export default function App() {
                 onCreateWithdrawal={handleCreateWithdrawal}
                 onCreatePlan={handleCreatePlan}
                 onCancelPlan={handleCancelPlan}
-                onUpdateTxStatus={handleUpdateTxStatus}
+                onUpdateTxStatus={async (type, txId, status) => {
+                  // DashboardCard does not support admin action with userId and amount, so we pass a no-op wrapper
+                }}
                 onSignOut={handleSignOut}
                 investmentProfits={investmentProfits}
                 maturedBalance={maturedBalance}
