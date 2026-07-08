@@ -234,7 +234,7 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
       
       onLoginSuccess(user.uid);
     } catch (error) {
-      setError("Google Sign-In failed.");
+      setError(`Google Sign-In failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       console.error(error);
     } finally {
       setIsLoading(false);
