@@ -76,7 +76,7 @@ app.post("/api/send-otp", async (req, res) => {
 
 // Fetch dynamic SMTP settings from Firestore document 'users/global_settings'
 async function fetchGlobalSettings() {
-  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-a807d10e-b26a-4c76-90b4-c26febef321c/documents/users/global_settings";
+  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-remixearnhub-a807d10e-b26a-4c76-90b4-c26febef321c/documents/users/global_settings";
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -112,7 +112,7 @@ async function fetchGlobalSettings() {
 
 // Log email delivery status to firestore 'email_logs' root collection
 async function logEmailDelivery(to: string, subject: string, status: "success" | "failed", errorMsg?: string) {
-  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-a807d10e-b26a-4c76-90b4-c26febef321c/documents/email_logs";
+  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-remixearnhub-a807d10e-b26a-4c76-90b4-c26febef321c/documents/email_logs";
   const body = {
     fields: {
       to: { stringValue: to },
@@ -140,7 +140,7 @@ async function logEmailDelivery(to: string, subject: string, status: "success" |
   }
 }
 
-// Unified email sending utility supporting Resend API delivery
+// Unified email sending utility supporting SMTP and Resend API delivery
 async function sendGeneralEmail({
   to,
   subject,
@@ -166,6 +166,83 @@ async function sendGeneralEmail({
     return { success: true, provider: "demo", note: "Simulated placeholder email auto-filtered" };
   }
 
+  // 1. Try dynamic SMTP settings from Firestore users/global_settings first
+  const settings = await fetchGlobalSettings();
+  if (settings && settings.smtpHost && settings.smtpUser && settings.smtpPass) {
+    try {
+      console.log(`[SMTP Engine] Attempting dispatch to SMTP host ${settings.smtpHost}:${settings.smtpPort || 465} for user: ${settings.smtpUser}`);
+      const transporter = nodemailer.createTransport({
+        host: settings.smtpHost.trim(),
+        port: Number(settings.smtpPort) || 465,
+        secure: Number(settings.smtpPort) === 465 || !settings.smtpPort,
+        auth: {
+          user: settings.smtpUser.trim(),
+          pass: settings.smtpPass.trim(),
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      const mailOptions = {
+        from: `"${settings.senderName || 'MoneyMind Space'}" <${settings.smtpUser.trim()}>`,
+        to,
+        subject,
+        text,
+        html,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[SMTP Success] Delivered successfully via SMTP to: ${to} (Message ID: ${info.messageId})`);
+      await logEmailDelivery(to, subject, "success");
+      return { success: true, provider: "smtp", id: info.messageId };
+    } catch (smtpErr: any) {
+      console.error(`[SMTP Fail] Delivery to ${to} failed:`, smtpErr);
+      // Fall back to other mechanisms
+    }
+  }
+
+  // 2. Try Vercel / environment-based SMTP config
+  const envHost = (process.env.EMAIL_SMTP_HOST || "").trim();
+  const envUser = (process.env.EMAIL_SMTP_USER || "").trim();
+  const envPass = (process.env.EMAIL_SMTP_PASS || "").trim();
+  const envPort = Number(process.env.EMAIL_SMTP_PORT || "465");
+  const envSecure = process.env.EMAIL_SMTP_SECURE !== "false";
+
+  if (envHost && envUser && envPass) {
+    try {
+      console.log(`[Environment SMTP Engine] Attempting dispatch to SMTP host ${envHost}:${envPort} for user: ${envUser}`);
+      const transporter = nodemailer.createTransport({
+        host: envHost,
+        port: envPort,
+        secure: envSecure,
+        auth: {
+          user: envUser,
+          pass: envPass,
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      const mailOptions = {
+        from: `"MoneyMind Space" <${envUser}>`,
+        to,
+        subject,
+        text,
+        html,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[Environment SMTP Success] Delivered successfully via SMTP to: ${to} (Message ID: ${info.messageId})`);
+      await logEmailDelivery(to, subject, "success");
+      return { success: true, provider: "smtp", id: info.messageId };
+    } catch (envSmtpErr: any) {
+      console.error(`[Environment SMTP Fail] Delivery to ${to} failed:`, envSmtpErr);
+    }
+  }
+
+  // 3. Fall back to Resend API if configured
   const resendApiKey = (process.env.RESEND_API_KEY || "").trim();
   const senderEmail = "support@moneymindspace.online";
 
@@ -191,7 +268,6 @@ async function sendGeneralEmail({
         const errorText = await response.text();
         console.warn(`[Resend Primary Fail] ${errorText}. Executing automatic retry with onboarding@resend.dev...`);
         
-        // Automated fallback to onboarding@resend.dev to ensure seamless free-tier delivery
         response = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -224,8 +300,8 @@ async function sendGeneralEmail({
       return { success: false, provider: "resend", error: errMsg };
     }
   } else {
-    console.log(`[Email System] RESEND_API_KEY is unconfigured. Preserving message in simulated demo logs.`);
-    await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (RESEND_API_KEY unconfigured)");
+    console.log(`[Email System] No SMTP or RESEND_API_KEY is configured. Preserving message in simulated demo logs.`);
+    await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (No SMTP or RESEND_API_KEY)");
     return { success: true, provider: "demo", note: "Simulated mail logs created" };
   }
 }
