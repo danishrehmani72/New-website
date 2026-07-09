@@ -452,16 +452,42 @@ export default function AdminPanel({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => {
-                            setSelectedUserForEdit(user);
-                            setNewBonusAmount((user.dailyBonusEarnings || 0).toString());
-                            setIsUserEditModalOpen(true);
-                          }}
-                          className="px-4 py-1.5 bg-white/5 hover:bg-blue-600 hover:text-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer border border-white/10"
-                        >
-                          Adjust
-                        </button>
+                        <div className="flex justify-end items-center gap-2">
+                          <button 
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const userRef = doc(db, 'users', user.id);
+                                const newBlockedState = !user.blocked;
+                                await updateDoc(userRef, {
+                                  blocked: newBlockedState,
+                                  updatedAt: serverTimestamp()
+                                });
+                                onAddToast(`User @${user.userId || 'Unknown'} is now ${newBlockedState ? 'BANNED 🚫' : 'UNBANNED ✅'}.`, newBlockedState ? 'error' : 'success');
+                              } catch (err: any) {
+                                onAddToast("Failed to change user status: " + err.message, "error");
+                              }
+                            }}
+                            className={`px-3 py-1.5 font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer border ${
+                              user.blocked 
+                                ? 'bg-emerald-600/10 hover:bg-emerald-500 hover:text-black text-emerald-400 border-emerald-500/20' 
+                                : 'bg-rose-600/10 hover:bg-rose-600 hover:text-black text-rose-400 border-rose-500/20'
+                            }`}
+                          >
+                            {user.blocked ? 'Unban' : 'Ban'}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setSelectedUserForEdit(user);
+                              setNewBonusAmount((user.dailyBonusEarnings || 0).toString());
+                              setIsUserEditModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-blue-600 hover:text-black text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer border border-white/10"
+                          >
+                            Adjust
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

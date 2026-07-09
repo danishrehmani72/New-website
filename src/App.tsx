@@ -1358,7 +1358,7 @@ export default function App() {
     const prevBalance = balance; // Use current calculated balance for logging
 
     // Client-side quick check (optional, transaction will handle properly)
-    if (dayIndex !== null) {
+    if (!giftCode) {
         const lastClaimed = userProfile.lastClaimedAt ? new Date(userProfile.lastClaimedAt) : null;
         if (lastClaimed && (now.getTime() - lastClaimed.getTime()) < 24 * 60 * 60 * 1000) {
           addToast("Next reward available in 24 hours.", "error");
@@ -1381,17 +1381,20 @@ export default function App() {
         }
 
         const userData = userDoc.data() as UserProfile;
+        const currentStreak = userData.claimStreak || 0;
         
-        // 1. Verify reward hasn't been claimed (Duplicate Protection)
-        if (dayIndex !== null) {
-          // Strict verification: only allow claiming the CURRENT streak day
-          if (userData.claimStreak !== dayIndex) {
-            throw new Error("Invalid reward day. This reward has already been claimed or is not yet available.");
-          }
-
+        // 1. Verify reward hasn't been claimed (Duplicate Protection & Cooldown)
+        if (!giftCode) {
           const lastClaimed = userData.lastClaimedAt ? new Date(userData.lastClaimedAt) : null;
           if (lastClaimed && (now.getTime() - lastClaimed.getTime()) < 24 * 60 * 60 * 1000) {
             throw new Error("Next reward available in 24 hours.");
+          }
+
+          if (dayIndex !== null) {
+            // Strict verification: only allow claiming the CURRENT active calendar day (modulo 8)
+            if (currentStreak % 8 !== dayIndex) {
+              throw new Error("Invalid reward day. This reward has already been claimed or is not yet available.");
+            }
           }
         }
 
@@ -1411,12 +1414,13 @@ export default function App() {
         if (giftCode) {
           const currentUsedCodes = userData.usedGiftCodes || [];
           updateData.usedGiftCodes = [...currentUsedCodes, giftCode];
-        }
-
-        if (dayIndex !== null) {
-          const currentStreak = userData.claimStreak || 0;
-          updateData.claimStreak = currentStreak + 1;
+        } else {
+          // Both the 7-day tracker and the dashboard yield check-in count as a daily claim
           updateData.lastClaimedAt = now.toISOString();
+
+          if (dayIndex !== null) {
+            updateData.claimStreak = currentStreak + 1;
+          }
         }
 
         // 3. Update User Document

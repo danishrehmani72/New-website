@@ -4545,10 +4545,13 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                   { d: 7, amt: 250 },
                   { d: 8, amt: 500, isVip: true },
                 ].map((item, idx) => {
-                  const day = idx + 1;
-                  const isClaimed = userProfile.claimStreak > idx;
-                  const isNext = userProfile.claimStreak === idx;
-                  const lastClaimed = userProfile.lastClaimedAt ? new Date(userProfile.lastClaimedAt) : null;
+                  const currentStreak = userProfile?.claimStreak || 0;
+                  const currentCycle = Math.floor(currentStreak / 8);
+                  const overallIndexForDay = currentCycle * 8 + idx;
+                  
+                  const isClaimed = currentStreak > overallIndexForDay;
+                  const isNext = currentStreak === overallIndexForDay;
+                  const lastClaimed = userProfile?.lastClaimedAt ? new Date(userProfile.lastClaimedAt) : null;
                   const now = new Date();
                   const canClaim = isNext && (!lastClaimed || (now.getTime() - lastClaimed.getTime()) >= 24 * 60 * 60 * 1000);
                   
