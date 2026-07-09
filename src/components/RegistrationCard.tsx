@@ -73,6 +73,24 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
   const [resetEnteredOtp, setResetEnteredOtp] = useState('');
   const [isSendingResetOtp, setIsSendingResetOtp] = useState(false);
 
+  // Cooldown timers for OTP resend buttons
+  const [signupCooldown, setSignupCooldown] = useState(0);
+  const [resetCooldown, setResetCooldown] = useState(0);
+
+  React.useEffect(() => {
+    if (signupCooldown > 0) {
+      const t = setTimeout(() => setSignupCooldown(signupCooldown - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [signupCooldown]);
+
+  React.useEffect(() => {
+    if (resetCooldown > 0) {
+      const t = setTimeout(() => setResetCooldown(resetCooldown - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [resetCooldown]);
+
   // 1. Store and track User IP, Device Fingerprint, Browser info, Email verification & Captcha states
   const [email, setEmail] = useState('');
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
@@ -105,52 +123,71 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
       setError('Please enter a valid email address.');
       return;
     }
+    if (signupCooldown > 0) {
+      setError(`Please wait ${signupCooldown} seconds before requesting another code. 🛡️`);
+      return;
+    }
     setError('');
     setIsSendingCode(true);
     setSentCode(null);
     
-    const randomVal = Math.floor(100000 + Math.random() * 900000).toString();
-    setEmailVerificationCode(randomVal);
-    
     try {
-      const response = await fetch('/api/send-otp', {
+      const response = await fetch('/api/otp/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: email.trim(), code: randomVal }),
+        body: JSON.stringify({ email: email.trim(), type: 'signup' }),
       });
       
       const data = await response.json();
       setIsSendingCode(false);
       
-      if (data.success) {
+      if (response.ok && data.success) {
+        setSignupCooldown(60); // 60-second cooldown
         if (data.mode === 'demo') {
-          setSentCode(`📧 Verification code: ${randomVal} (Demo Mode).`);
+          setSentCode(`📧 Verification code: ${data.code} (Demo Mode).`);
           setIsCodeModalOpen(true);
         } else {
           setSentCode(`📧 Verification code dispatched to ${email}. Please check your Inbox.`);
           setIsCodeModalOpen(true);
         }
       } else {
-        setError(data.error || 'SMTP dispatch failure.');
-        setSentCode(`📧 Email failed. Your verification code is: ${randomVal}. Please use this code to verify.`);
-        setIsCodeModalOpen(true);
+        setError(data.error || 'OTP dispatch failure.');
+        if (data.code) {
+          setSentCode(`📧 Backup Dispatch: Since email delivery is pending, use verification code ${data.code} to proceed.`);
+          setIsCodeModalOpen(true);
+        }
       }
     } catch (err) {
-      console.warn("Express backend SMTP proxy inaccessible or offline:", err);
+      console.warn("Express backend OTP API inaccessible:", err);
       setIsSendingCode(false);
-      setSentCode(`📧 Email failed. Your verification code is: ${randomVal}. Please use this code to verify.`);
-      setIsCodeModalOpen(true);
+      setError('System connection error. Unable to dispatch OTP.');
     }
   };
 
-  const handleVerifyEmailCode = () => {
-    if (enteredCode.trim() === emailVerificationCode && emailVerificationCode !== '') {
-      setIsEmailVerified(true);
-      setError('');
-    } else {
-      setError('❌ Incorrect 6-Digit Email Verification Code. Please try again.');
+  const handleVerifyEmailCode = async () => {
+    if (!enteredCode.trim() || enteredCode.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code.');
+      return;
+    }
+    setError('');
+    try {
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), code: enteredCode.trim(), type: 'signup' })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setIsEmailVerified(true);
+        setSuccessMsg('✅ Email address verified successfully!');
+        setTimeout(() => setSuccessMsg(''), 3000);
+      } else {
+        setError(data.error || '❌ Incorrect or expired verification code.');
+      }
+    } catch (err) {
+      setError('System connection error. Unable to verify OTP.');
     }
   };
 
@@ -479,6 +516,7 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
         full_name: cleanName, // lowercase DB key
         email: email.trim(),
         emailVerified: isEmailVerified,
+        email_verified: isEmailVerified,
         deviceFingerprint: currentFingerprint,
         ipAddress: clientIp,
         browserInfo: navigator.userAgent,
@@ -807,6 +845,11 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
       return;
     }
 
+    if (resetCooldown > 0) {
+      setResetError(`Please wait ${resetCooldown} seconds before requesting another code. 🛡️`);
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Search for a registered user with this email
@@ -825,62 +868,71 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
       const foundUserId = userDoc.id;
       setResetUserId(foundUserId);
 
-      // 2. Generate 6-digit OTP
-      const randomVal = Math.floor(100000 + Math.random() * 900000).toString();
-      setResetGeneratedOtp(randomVal);
-
-      // 3. Dispatch OTP via backend SMTP
+      // 2. Dispatch OTP via backend secure API
       setIsSendingResetOtp(true);
-      const response = await fetch('/api/send-otp', {
+      const response = await fetch('/api/otp/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: targetEmail, code: randomVal }),
+        body: JSON.stringify({ email: targetEmail, type: 'reset' }),
       });
 
       const data = await response.json();
       setIsSendingResetOtp(false);
 
-      if (data.success) {
+      if (response.ok && data.success) {
+        setResetCooldown(60); // 60-second cooldown
         if (data.mode === 'demo') {
-          setResetSuccess(`📧 Demo Mode: Verification code is ${randomVal}. Please use this to verify.`);
+          setResetSuccess(`📧 Demo Mode: Verification code is ${data.code}. Please use this to verify.`);
         } else {
           setResetSuccess(`📧 Verification code dispatched to ${targetEmail}. Please check your Inbox.`);
         }
         setResetStep(2); // Go to OTP verification step
       } else {
-        setResetError(data.error || 'SMTP dispatch failure.');
-        setResetSuccess(`📧 Email failed. Since SMTP is pending config, use code ${randomVal} to verify.`);
-        setResetStep(2);
+        setResetError(data.error || 'OTP dispatch failure.');
+        if (data.code) {
+          setResetSuccess(`📧 Backup Dispatch: Since email delivery is pending, use verification code ${data.code} to proceed.`);
+          setResetStep(2);
+        }
       }
     } catch (err: any) {
-      console.warn("Express backend SMTP proxy inaccessible:", err);
+      console.warn("Express backend secure OTP API inaccessible:", err);
       setIsSendingResetOtp(false);
-      const randomVal = Math.floor(100000 + Math.random() * 900000).toString();
-      setResetGeneratedOtp(randomVal);
-      setResetSuccess(`📧 Simulated Dispatch: Use verification code ${randomVal} to proceed.`);
-      setResetStep(2);
+      setResetError('System connection error. Unable to send recovery code.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyResetOtp = (e: React.FormEvent) => {
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetError('');
     setResetSuccess('');
 
-    if (!resetEnteredOtp.trim()) {
+    if (!resetEnteredOtp.trim() || resetEnteredOtp.trim().length !== 6) {
       setResetError('Please enter the 6-digit verification code.');
       return;
     }
 
-    if (resetEnteredOtp.trim() === resetGeneratedOtp.trim()) {
-      setResetStep(3); // Go to new password setup step
-      setResetSuccess('✅ Email verified successfully! Please choose your new password.');
-    } else {
-      setResetError('❌ Invalid verification code. Please check your inbox and try again.');
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim(), code: resetEnteredOtp.trim(), type: 'reset' })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setResetStep(3); // Go to new password setup step
+        setResetSuccess('✅ Email verified successfully! Please choose your new password.');
+      } else {
+        setResetError(data.error || '❌ Incorrect or expired verification code.');
+      }
+    } catch (err) {
+      setResetError('System connection error. Unable to verify recovery code.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1282,11 +1334,11 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
                 />
                 <button
                   type="button"
-                  disabled={isEmailVerified || isSendingCode || !email.includes('@')}
+                  disabled={isEmailVerified || isSendingCode || signupCooldown > 0 || !email.includes('@')}
                   onClick={handleSendVerificationCode}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-[#c39e2e] disabled:bg-white/5 disabled:text-white/20 text-black text-[10.5px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10"
                 >
-                  {isSendingCode ? 'Sending...' : isEmailVerified ? 'Verified ✔' : 'Get Code'}
+                  {isSendingCode ? 'Sending...' : isEmailVerified ? 'Verified ✔' : signupCooldown > 0 ? `Resend (${signupCooldown}s)` : 'Get Code'}
                 </button>
               </div>
 
@@ -1666,13 +1718,21 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
                       setResetError('');
                       setResetSuccess('');
                     }}
-                    className="w-1/3 py-3.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 font-black text-2xs uppercase tracking-wider text-center cursor-pointer active:scale-95 transition-all"
+                    className="w-1/4 py-3.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 font-black text-2xs uppercase tracking-wider text-center cursor-pointer active:scale-95 transition-all"
                   >
                     Back
                   </button>
                   <button
+                    type="button"
+                    disabled={resetCooldown > 0 || isSendingResetOtp}
+                    onClick={handleSendResetOtp}
+                    className="w-1/3 py-3.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 font-black text-2xs uppercase tracking-wider text-center cursor-pointer active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    {resetCooldown > 0 ? `Resend (${resetCooldown}s)` : 'Resend'}
+                  </button>
+                  <button
                     type="submit"
-                    className="w-2/3 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-black font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all duration-300 text-center shadow-lg shadow-blue-500/10 cursor-pointer"
+                    className="w-5/12 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-black font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all duration-300 text-center shadow-lg shadow-blue-500/10 cursor-pointer"
                   >
                     Verify Code
                   </button>

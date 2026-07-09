@@ -25,6 +25,312 @@ const ai = process.env.GEMINI_API_KEY
 // Middleware for body parsing
 app.use(express.json());
 
+// Secure Server-Side OTP helpers and routes
+
+async function checkOtpRateLimit(email: string): Promise<{ allowed: boolean; waitSeconds?: number }> {
+  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-remixearnhub-a807d10e-b26a-4c76-90b4-c26febef321c/documents:runQuery";
+  try {
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: "otps" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "email" },
+            op: "EQUAL",
+            value: { stringValue: email.toLowerCase().trim() }
+          }
+        },
+        limit: 5
+      }
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      return { allowed: true };
+    }
+
+    const data = await res.json();
+    let latestTime = 0;
+
+    if (data && Array.isArray(data)) {
+      for (const item of data) {
+        if (item.document) {
+          const fields = item.document.fields || {};
+          const createdAtStr = fields.createdAt?.stringValue;
+          if (createdAtStr) {
+            const time = new Date(createdAtStr).getTime();
+            if (time > latestTime) {
+              latestTime = time;
+            }
+          }
+        }
+      }
+    }
+
+    if (latestTime > 0) {
+      const now = Date.now();
+      const diffSeconds = Math.floor((now - latestTime) / 1000);
+      if (diffSeconds < 60) {
+        return { allowed: false, waitSeconds: 60 - diffSeconds };
+      }
+    }
+    return { allowed: true };
+  } catch (err) {
+    console.error("[OTP System] Rate limit check error:", err);
+    return { allowed: true };
+  }
+}
+
+async function saveOtpToFirestore(email: string, code: string, type: string) {
+  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-remixearnhub-a807d10e-b26a-4c76-90b4-c26febef321c/documents/otps";
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes expiry
+
+  const body = {
+    fields: {
+      email: { stringValue: email.toLowerCase().trim() },
+      code: { stringValue: code.trim() },
+      type: { stringValue: type },
+      createdAt: { stringValue: now.toISOString() },
+      expiresAt: { stringValue: expiresAt.toISOString() },
+      verified: { booleanValue: false }
+    }
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`[OTP System] Failed to write OTP: status ${res.status}, ${text}`);
+    }
+  } catch (err) {
+    console.error("[OTP System] Error saving OTP:", err);
+  }
+}
+
+async function verifyOtpInFirestore(email: string, code: string, type: string): Promise<boolean> {
+  const url = "https://firestore.googleapis.com/v1/projects/cogent-woodland-x9z5m/databases/ai-studio-remixearnhub-a807d10e-b26a-4c76-90b4-c26febef321c/documents:runQuery";
+  try {
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: "otps" }],
+        where: {
+          compositeFilter: {
+            op: "AND",
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: "email" },
+                  op: "EQUAL",
+                  value: { stringValue: email.toLowerCase().trim() }
+                }
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: "code" },
+                  op: "EQUAL",
+                  value: { stringValue: code.trim() }
+                }
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: "type" },
+                  op: "EQUAL",
+                  value: { stringValue: type }
+                }
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: "verified" },
+                  op: "EQUAL",
+                  value: { booleanValue: false }
+                }
+              }
+            ]
+          }
+        },
+        limit: 1
+      }
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      console.warn(`[OTP System] runQuery status: ${res.status}`);
+      return false;
+    }
+
+    const data = await res.json();
+    if (data && data.length > 0 && data[0].document) {
+      const doc = data[0].document;
+      const fields = doc.fields || {};
+      const expiresAtStr = fields.expiresAt?.stringValue;
+      if (expiresAtStr) {
+        const expiresAt = new Date(expiresAtStr).getTime();
+        const now = Date.now();
+        if (now <= expiresAt) {
+          const docName = doc.name; // full resource path
+          await markOtpAsVerified(docName);
+          return true;
+        } else {
+          console.log(`[OTP System] Code is expired for ${email}`);
+        }
+      }
+    }
+    return false;
+  } catch (err) {
+    console.error("[OTP System] Error verifying OTP via REST:", err);
+    return false;
+  }
+}
+
+async function markOtpAsVerified(docResourceName: string) {
+  const url = `https://firestore.googleapis.com/v1/${docResourceName}?updateMask.fieldPaths=verified`;
+  const body = {
+    fields: {
+      verified: { booleanValue: true }
+    }
+  };
+  try {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      console.warn(`[OTP System] Failed to patch verified status: ${res.status}`);
+    }
+  } catch (err) {
+    console.error("[OTP System] Error patching OTP document:", err);
+  }
+}
+
+// REST route to send OTP
+app.post("/api/otp/send", async (req, res) => {
+  const { email, type } = req.body;
+  if (!email || !type) {
+    return res.status(400).json({ error: "Email and type (signup | reset) are required." });
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Check Rate Limit (60-second cooldown per email)
+  const rateLimit = await checkOtpRateLimit(cleanEmail);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ 
+      error: `Please wait ${rateLimit.waitSeconds} seconds before requesting another code. 🛡️` 
+    });
+  }
+
+  // 2. Generate secure 6-digit OTP
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // 3. Save to Firestore
+  await saveOtpToFirestore(cleanEmail, code, type);
+
+  // 4. Send Email using Resend/SMTP
+  let subject = "";
+  let html = "";
+  let text = "";
+
+  if (type === "signup") {
+    subject = `[MoneyMind Space] Verify your email address`;
+    text = `Hello,\n\nYour 6-digit Email Verification OTP is: ${code}\n\nThis code will expire in 10 minutes.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #10B981; font-weight: 800; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">MoneyMind Space</h2>
+          <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 2px;">Email Verification System</span>
+        </div>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">Hello,</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">Thank you for starting your registration on MoneyMind Space. To confirm your email address ownership, please use the 6-digit security code below:</p>
+        <div style="background-color: #f8fafc; padding: 25px; text-align: center; border-radius: 12px; margin: 25px 0; border: 1px solid #e2e8f0;">
+          <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #111827; font-family: monospace;">${code}</span>
+        </div>
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5;">⚠️ <strong>Note:</strong> This verification code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">Best regards,<br><strong>MoneyMind Space Team</strong></p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 30px;">
+          This is an automated transmission. Please do not reply directly.
+        </p>
+      </div>
+    `;
+  } else if (type === "reset") {
+    subject = `[MoneyMind Space] Password Reset Request`;
+    text = `Hello,\n\nYour 6-digit Password Reset Recovery OTP is: ${code}\n\nThis code will expire in 10 minutes.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #3B82F6; font-weight: 800; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">MoneyMind Space</h2>
+          <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; letter-spacing: 2px;">Security Recovery Portal</span>
+        </div>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">Hello,</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">We received a request to reset your MoneyMind Space account password. To authorize this reset, please use the 6-digit recovery code below:</p>
+        <div style="background-color: #f8fafc; padding: 25px; text-align: center; border-radius: 12px; margin: 25px 0; border: 1px solid #e2e8f0;">
+          <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #111827; font-family: monospace;">${code}</span>
+        </div>
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5;">⚠️ <strong>Note:</strong> This recovery code is valid for <strong>10 minutes</strong>. If you did not request this, please secure your email account immediately.</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.5;">Best regards,<br><strong>MoneyMind Space Team</strong></p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 30px;">
+          This is an automated transmission. Please do not reply directly.
+        </p>
+      </div>
+    `;
+  }
+
+  try {
+    const result = await sendGeneralEmail({ to: cleanEmail, subject, text, html });
+    if (result.success) {
+      return res.json({ success: true, mode: result.provider === "demo" ? "demo" : "live", cooldownSeconds: 60 });
+    } else {
+      console.warn(`[OTP System] OTP delivery failed, returning demo code: ${result.error}`);
+      return res.json({ 
+        success: true, 
+        mode: "demo", 
+        cooldownSeconds: 60,
+        message: "Delivery fallback active.",
+        code: code 
+      });
+    }
+  } catch (err: any) {
+    console.error("[OTP System] Delivery error:", err);
+    return res.json({ 
+      success: true, 
+      mode: "demo", 
+      cooldownSeconds: 60,
+      message: "Delivery fallback active.",
+      code: code
+    });
+  }
+});
+
+// REST route to verify OTP
+app.post("/api/otp/verify", async (req, res) => {
+  const { email, code, type } = req.body;
+  if (!email || !code || !type) {
+    return res.status(400).json({ error: "Email, Code and Type are required." });
+  }
+
+  const isValid = await verifyOtpInFirestore(email, code, type);
+  if (isValid) {
+    return res.json({ success: true, message: "OTP verified successfully! ✔" });
+  } else {
+    return res.status(400).json({ success: false, error: "Incorrect, used or expired verification code." });
+  }
+});
+
 // API route to dispatch OTP codes to user emails via Resend API
 app.post("/api/send-otp", async (req, res) => {
   const { email, code } = req.body;

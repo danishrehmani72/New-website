@@ -67,6 +67,7 @@ import {
   Legend
 } from 'recharts';
 import { FaqSection } from './FaqSection';
+import EmailVerificationModal from './EmailVerificationModal';
 import { ReferralLog, DepositLog, WithdrawalLog, UserPlan, DailyRewardLog, Task, TaskSubmission } from '../types';
 import { AvatarIcon, getAvatarConfig, AVATAR_PRESETS } from '../lib/avatars';
 
@@ -123,6 +124,7 @@ interface DashboardCardProps {
   activeTab?: 'overview' | 'funding' | 'faq' | 'settings' | 'security';
   onActiveTabChange?: (tab: 'overview' | 'funding' | 'faq' | 'settings' | 'security') => void;
   onUpdateProfile?: (newName: string, newAvatar: string) => Promise<void>;
+  onVerifyEmail?: () => Promise<void>;
   dailyRewardLogs?: DailyRewardLog[];
   tasks?: Task[];
   taskSubmissions?: TaskSubmission[];
@@ -161,6 +163,7 @@ export default function DashboardCard({
   activeTab: activeTabProp,
   onActiveTabChange,
   onUpdateProfile,
+  onVerifyEmail,
   dailyRewardLogs = [],
   tasks = [],
   taskSubmissions = [],
@@ -176,6 +179,7 @@ export default function DashboardCard({
   const [showWithdrawSheet, setShowWithdrawSheet] = useState(false);
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [showQuickActionsDrawer, setShowQuickActionsDrawer] = useState(false);
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
 
   // 2FA Security states
   const [is2faEnabled, setIs2faEnabled] = useState(() => localStorage.getItem('apex_2fa_enabled') === 'true');
@@ -3743,11 +3747,33 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                         <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-3">
                           <div className="flex items-center justify-between text-[11px]">
                             <span className="text-zinc-500 uppercase font-black tracking-widest">Status:</span>
-                            <span className="text-blue-400 font-bold uppercase tracking-widest bg-blue-600/10 px-2.5 py-0.5 rounded-md border border-blue-500/20">
-                              Verified Member
-                            </span>
+                            {userProfile?.emailVerified ? (
+                              <span className="text-emerald-400 font-bold uppercase tracking-widest bg-emerald-600/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
+                                Email Verified
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-red-400 font-bold uppercase tracking-widest bg-red-600/10 px-2.5 py-0.5 rounded-md border border-red-500/20">
+                                  Unverified
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEmailVerificationModal(true)}
+                                  className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-500 text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer border-0"
+                                >
+                                  Verify Now
+                                </button>
+                              </div>
+                            )}
                           </div>
                           
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-zinc-500 uppercase font-black tracking-widest">Email:</span>
+                            <span className="text-zinc-400 font-mono text-[10px] break-all max-w-[150px] text-right">
+                              {userProfile?.email || 'N/A'}
+                            </span>
+                          </div>
+
                           <div className="flex items-center justify-between text-[11px]">
                             <span className="text-zinc-500 uppercase font-black tracking-widest">ID:</span>
                             <span className="text-zinc-400 font-mono text-[10px] break-all max-w-[150px] text-right">
@@ -4944,6 +4970,18 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
           </motion.div>
         )}
       </AnimatePresence>
+
+      <EmailVerificationModal
+        isOpen={showEmailVerificationModal}
+        onClose={() => setShowEmailVerificationModal(false)}
+        email={userProfile?.email || ''}
+        onVerifySuccess={async () => {
+          if (onVerifyEmail) {
+            await onVerifyEmail();
+          }
+        }}
+        onAddToast={onAddToast}
+      />
 
       {/* 📱 STICKY BOTTOM NAVIGATION BAR (Screenshot style: Home, Funding, FAQ, Profile) */}
       {activeTab === 'overview' && (

@@ -1073,6 +1073,22 @@ export default function App() {
     }
   };
 
+  // Update user profile emailVerified flag in Firestore
+  const handleVerifyEmail = async () => {
+    if (!currentUid) return;
+    try {
+      const userRef = doc(db, 'users', currentUid);
+      await setDoc(userRef, {
+        emailVerified: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      addToast('Email verified successfully! 🛡️', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${currentUid}`);
+      throw error;
+    }
+  };
+
   // Submit a deposit record
   const handleCreateDeposit = async (amount: number, network: string, txHash: string) => {
     if (!currentUid) return;
@@ -2453,6 +2469,7 @@ export default function App() {
                 activeTab={dashboardTab}
                 onActiveTabChange={setDashboardTab}
                 onUpdateProfile={handleUpdateProfile}
+                onVerifyEmail={handleVerifyEmail}
                 onRefresh={handleRefreshAllData}
                 globalSettings={globalSettings}
                 theme={theme}

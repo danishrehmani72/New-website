@@ -408,7 +408,14 @@ export default function AdminPanel({
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-[10px] font-mono text-white/50">{user.email || 'No email'}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-mono text-white/50">{user.email || 'No email'}</span>
+                          {user.email && (
+                            <span className={`inline-flex items-center gap-1 text-[8px] font-black uppercase w-max px-1.5 py-0.5 rounded ${user.emailVerified || user.email_verified ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                              {user.emailVerified || user.email_verified ? 'Verified ✔' : 'Not Verified ✘'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-xs font-black text-emerald-400">${(user.dailyBonusEarnings || 0).toFixed(2)}</span>
