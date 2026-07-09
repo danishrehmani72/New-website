@@ -54,6 +54,7 @@ import {
 import { db } from '../lib/firebase';
 import { 
   collection, 
+  collectionGroup,
   query, 
   where, 
   orderBy, 
@@ -98,12 +99,40 @@ export default function AdminPanel({
   const [activeChartTab, setActiveChartTab] = useState<'revenue' | 'users' | 'activity'>('revenue');
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [txSearchText, setTxSearchText] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'deposits' | 'withdrawals'>('all');
+  const [filterType, setFilterType] = useState<'deposits' | 'withdrawals'>('deposits');
   const [filterWStatus, setFilterWStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
+
+  // Memoized Filtered Deposits
+  const filteredDeposits = useMemo(() => {
+    return deposits.filter(d => {
+      const searchMatch = !txSearchText.trim() || 
+        (d.userId && d.userId.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (d.userName && d.userName.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (d.email && d.email.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (d.txHash && d.txHash.toLowerCase().includes(txSearchText.toLowerCase()));
+      
+      const statusMatch = filterWStatus === 'all' || d.status === filterWStatus;
+      return searchMatch && statusMatch;
+    });
+  }, [deposits, txSearchText, filterWStatus]);
+
+  // Memoized Filtered Withdrawals
+  const filteredWithdrawals = useMemo(() => {
+    return withdrawals.filter(w => {
+      const searchMatch = !txSearchText.trim() || 
+        (w.userId && w.userId.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (w.userName && w.userName.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (w.email && w.email.toLowerCase().includes(txSearchText.toLowerCase())) ||
+        (w.wallet && w.wallet.toLowerCase().includes(txSearchText.toLowerCase()));
+      
+      const statusMatch = filterWStatus === 'all' || w.status === filterWStatus;
+      return searchMatch && statusMatch;
+    });
+  }, [withdrawals, txSearchText, filterWStatus]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
@@ -133,19 +162,16 @@ export default function AdminPanel({
     });
 
     // Fetch All Deposits
-    const unsubDeposits = onSnapshot(collection(db, 'task_submissions'), (snapshot) => {
-        // Wait, task_submissions is for tasks. We need the real deposits.
-        // The real deposits are in subcollections users/{id}/deposits.
-        // Firestore doesn't easily allow querying all subcollections without collectionGroup.
-        // But for this app, maybe there's a global 'deposits' collection or we just rely on task submissions for now?
-        // Let's check if there's a collectionGroup query possible or if there's a top-level collection.
+    const unsubDeposits = onSnapshot(query(collectionGroup(db, 'deposits'), orderBy('createdAt', 'desc')), (snapshot) => {
+      const depositsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDeposits(depositsList);
+    }, (err) => {
+      console.warn("Silent admin deposits feed sync issue:", err);
     });
-
-    // Actually, let's just fetch everything from collectionGroup if possible, or skip for now if not set up.
-    // Given the complexity, I'll fetch what I can.
 
     return () => {
       unsubUsers();
+      unsubDeposits();
     };
   }, []);
 
@@ -823,86 +849,251 @@ export default function AdminPanel({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Quick Switch Toggles & Search */}
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div className="flex p-0.5 rounded-lg bg-slate-950 border border-white/5 text-[8.5px] uppercase font-black">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterType('deposits');
+                    setFilterWStatus('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${filterType === 'deposits' ? 'bg-[#10B981] text-black font-extrabold' : 'text-white/40 hover:text-white'}`}
+                >
+                  Deposits ({deposits.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterType('withdrawals');
+                    setFilterWStatus('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${filterType === 'withdrawals' ? 'bg-[#3B82F6] text-black font-extrabold' : 'text-white/40 hover:text-white'}`}
+                >
+                  Withdrawals ({withdrawals.length})
+                </button>
+              </div>
+
+              {/* Status Filter */}
+              <select
+                value={filterWStatus}
+                onChange={(e) => setFilterWStatus(e.target.value as any)}
+                className="bg-slate-950 border border-white/5 rounded-xl py-2 px-3 text-[9px] text-white font-bold uppercase outline-none focus:border-blue-500/50 cursor-pointer"
+              >
+                <option value="all">ALL STATUSES</option>
+                <option value="pending">PENDING</option>
+                <option value="approved">APPROVED / PAID</option>
+                <option value="rejected">REJECTED</option>
+              </select>
+
               <div className="relative flex-1 sm:flex-initial">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20" />
                 <input 
                   type="text" 
-                  placeholder="Search user ID..." 
+                  placeholder={filterType === 'deposits' ? "Search deposits..." : "Search withdrawals..."}
                   value={txSearchText}
                   onChange={(e) => setTxSearchText(e.target.value)}
-                  className="w-full sm:w-48 py-2 pl-9 pr-4 bg-slate-950 border border-white/10 rounded-xl text-[10px] text-white focus:border-blue-500/50 outline-none transition-all font-mono"
+                  className="w-full sm:w-40 py-2 pl-9 pr-4 bg-slate-950 border border-white/10 rounded-xl text-[10px] text-white focus:border-blue-500/50 outline-none transition-all font-mono"
                 />
               </div>
-              <button className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all cursor-pointer">
-                <Settings className="w-4 h-4" />
-              </button>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
-              <thead>
-                <tr className="border-b border-white/5 bg-white/[0.01]">
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">User ID</th>
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Type</th>
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Amount</th>
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Network</th>
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Status</th>
-                  <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-white/30 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.03]">
-                {withdrawals.length > 0 ? (
-                  withdrawals.map((w) => (
-                    <tr key={w.id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-white font-mono">{w.userName || 'Unknown'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">Withdraw</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-black text-white">${w.amount?.toFixed(2) || '0.00'}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[10px] font-mono text-white/50">{w.network}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className={`flex items-center gap-1.5 ${w.status === 'pending' ? 'text-amber-500' : w.status === 'approved' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${w.status === 'pending' ? 'bg-amber-500 animate-pulse' : 'bg-current'}`} />
-                          <span className="text-[9px] font-black uppercase">{w.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                          {w.status === 'pending' && (
-                              <div className="flex justify-end gap-2">
-                                <button 
-                                  onClick={() => onUpdateTxStatus('withdrawal', w.id, 'approved', w.userId, w.amount)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer">Approve</button>
-                                <button 
-                                  onClick={() => onUpdateTxStatus('withdrawal', w.id, 'rejected', w.userId, w.amount)}
-                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer">Reject</button>
-                              </div>
-                          )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-white/20 uppercase tracking-widest text-[9px]">No pending withdrawal requests found</td>
+            {filterType === 'deposits' ? (
+              // DEPOSITS TABLE LIST
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.01]">
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">User / Account</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Amount</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Method</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Transaction ID</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Screenshot</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Date</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Status</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30 text-right">Action</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/[0.03]">
+                  {filteredDeposits.length > 0 ? (
+                    filteredDeposits.map((d) => (
+                      <tr key={d.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="px-5 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-white font-mono">{d.userName || 'Unknown'}</span>
+                            <span className="text-[9px] text-white/50">{d.email || 'N/A'}</span>
+                            <span className="text-[8px] text-white/20 font-mono">UID: {d.userId || 'N/A'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-xs font-black text-emerald-400">${d.amount?.toFixed(2) || '0.00'}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20">
+                            {d.network || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[10px] font-mono text-white/70 select-all break-all max-w-[120px] inline-block" title={d.txHash}>
+                            {d.txHash || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            {d.screenshot ? (
+                              <>
+                                <div className="relative group/thumb w-10 h-10 rounded-lg border border-white/10 overflow-hidden bg-slate-950 flex items-center justify-center shrink-0">
+                                  <img src={d.screenshot} alt="Screenshot thumb" className="max-w-full max-h-full object-cover" />
+                                  <button 
+                                    onClick={() => setActiveScreenshotModal(d.screenshot)}
+                                    className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white text-[7.5px] uppercase tracking-wider font-bold transition-opacity"
+                                  >
+                                    Zoom
+                                  </button>
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                  <button
+                                    onClick={() => setActiveScreenshotModal(d.screenshot)}
+                                    className="text-[8.5px] font-black text-blue-400 hover:text-blue-300 uppercase tracking-wider text-left cursor-pointer"
+                                  >
+                                    🔍 Zoom
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const link = document.createElement('a');
+                                      link.href = d.screenshot;
+                                      link.download = `deposit_proof_${d.userName || 'user'}_${d.amount}.png`;
+                                      link.click();
+                                    }}
+                                    className="text-[8.5px] font-black text-emerald-400 hover:text-emerald-300 uppercase tracking-wider text-left cursor-pointer"
+                                  >
+                                    📥 Download
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-[9px] text-white/20 italic">No proof image</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[9px] font-mono text-white/40">{d.timestamp || 'N/A'}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className={`flex items-center gap-1.5 ${d.status === 'pending' ? 'text-amber-500' : d.status === 'approved' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${d.status === 'pending' ? 'bg-amber-500 animate-pulse' : 'bg-current'}`} />
+                            <span className="text-[9px] font-black uppercase tracking-wider">{d.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {d.status === 'pending' && (
+                            <div className="flex justify-end gap-1.5">
+                              <button 
+                                onClick={() => onUpdateTxStatus('deposit', d.id, 'approved', d.userId, d.amount)}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => onUpdateTxStatus('deposit', d.id, 'rejected', d.userId, d.amount)}
+                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-white/20 uppercase tracking-widest text-[9px]">No pending deposit requests found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              // WITHDRAWALS TABLE LIST
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.01]">
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">User / Account</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Amount</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Withdraw Method</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Account Number</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Date</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30">Status</th>
+                    <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-white/30 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.03]">
+                  {filteredWithdrawals.length > 0 ? (
+                    filteredWithdrawals.map((w) => (
+                      <tr key={w.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="px-5 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-white font-mono">{w.userName || 'Unknown'}</span>
+                            <span className="text-[9px] text-white/50">{w.email || 'N/A'}</span>
+                            <span className="text-[8px] text-white/20 font-mono">UID: {w.userId || 'N/A'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-xs font-black text-rose-400">${w.amount?.toFixed(2) || '0.00'}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            {w.network || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[10px] font-mono text-white/70 select-all break-all max-w-[150px] inline-block">
+                            {w.wallet || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="text-[9px] font-mono text-white/40">{w.timestamp || 'N/A'}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className={`flex items-center gap-1.5 ${w.status === 'pending' ? 'text-amber-500' : w.status === 'approved' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${w.status === 'pending' ? 'bg-amber-500 animate-pulse' : 'bg-current'}`} />
+                            <span className="text-[9px] font-black uppercase tracking-wider">{w.status === 'approved' ? 'PAID' : w.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {w.status === 'pending' && (
+                            <div className="flex justify-end gap-1.5">
+                              <button 
+                                onClick={() => onUpdateTxStatus('withdrawal', w.id, 'approved', w.userId, w.amount)}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => onUpdateTxStatus('withdrawal', w.id, 'rejected', w.userId, w.amount)}
+                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-white/20 uppercase tracking-widest text-[9px]">No pending withdrawal requests found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
           
           <div className="p-4 border-t border-white/5 bg-slate-950/20 text-center">
-            <button className="text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-blue-400 transition-all cursor-pointer">
-              View Extended Transaction Ledger (42+)
-            </button>
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/20">
+              Live Audit Log Ledger Sync: Secure TLS 1.3
+            </span>
           </div>
         </div>
 

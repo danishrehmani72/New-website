@@ -45,6 +45,10 @@ export interface DepositLog {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
   timestamp: string;
+  screenshot?: string;
+  userName?: string;
+  userId?: string;
+  email?: string;
 }
 
 export interface WithdrawalLog {
@@ -55,6 +59,9 @@ export interface WithdrawalLog {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
   timestamp: string;
+  userName?: string;
+  userId?: string;
+  email?: string;
 }
 
 export interface UserPlan {

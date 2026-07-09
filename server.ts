@@ -836,6 +836,81 @@ app.post("/api/send-email", async (req, res) => {
         </p>
       </div>
     `;
+  } else if (normType === "deposit_approved") {
+    subject = `Deposit Approved - $${payload.amount} Credited`;
+    text = `Hello ${payload.userName || "User"},\n\nGood news! Your deposit request of $${payload.amount} has been approved. The funds have been successfully credited to your account balance.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #10B981; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 18px; margin-top: 0;">Deposit Approved!</h2>
+        <p>Dear <strong>${payload.userName || "User"}</strong>,</p>
+        <p>We are pleased to inform you that your deposit request has been approved and successfully credited to your account balance:</p>
+        <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981;">
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Amount:</strong> $${payload.amount}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Payment Method:</strong> ${payload.paymentMethod || "N/A"}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Status:</strong> Approved & Credited</p>
+        </div>
+        <p style="font-size: 14px; color: #334155; line-height: 1.6;">You can now view your upgraded balance and start earning staking profits immediately. Thank you for choosing MoneyMind Space.</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 25px;">
+          This is an automated confirmation. Please do not reply directly.
+        </p>
+      </div>
+    `;
+  } else if (normType === "deposit_rejected") {
+    subject = `Deposit Request Rejected`;
+    text = `Hello ${payload.userName || "User"},\n\nYour deposit request of $${payload.amount} has been rejected. If you believe this is an error, please contact support with your payment proof.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #dc2626; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 18px; margin-top: 0;">Deposit Request Rejected</h2>
+        <p>Dear <strong>${payload.userName || "User"}</strong>,</p>
+        <p>We regret to inform you that your deposit request has been rejected after review:</p>
+        <div style="background-color: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Amount:</strong> $${payload.amount}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Payment Method:</strong> ${payload.paymentMethod || "N/A"}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Status:</strong> Rejected</p>
+        </div>
+        <p style="font-size: 14px; color: #334155; line-height: 1.6;">Our security desk could not verify this transaction on our bank ledgers or blockchain explorers. If you believe this is a mistake, please contact support and submit a valid transaction ID or payment proof screenshot.</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 25px;">
+          This is an automated system notification.
+        </p>
+      </div>
+    `;
+  } else if (normType === "withdrawal_approved") {
+    subject = `Withdrawal Request Approved - Marked as Paid`;
+    text = `Hello ${payload.userName || "User"},\n\nYour withdrawal request of $${payload.amount} has been approved and processed. The funds have been sent to your account.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #10B981; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 18px; margin-top: 0;">Withdrawal Approved!</h2>
+        <p>Dear <strong>${payload.userName || "User"}</strong>,</p>
+        <p>Your withdrawal request has been approved and processed successfully:</p>
+        <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981;">
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Amount:</strong> $${payload.amount}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Payout Destination:</strong> ${payload.paymentMethod || "N/A"}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Status:</strong> Completed & Paid</p>
+        </div>
+        <p style="font-size: 14px; color: #334155; line-height: 1.6;">The funds have been sent to your selected account/wallet. Depending on your provider, please allow a short time for the transfer to show in your account.</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 25px;">
+          This is an automated payout notification.
+        </p>
+      </div>
+    `;
+  } else if (normType === "withdrawal_rejected") {
+    subject = `Withdrawal Request Rejected`;
+    text = `Hello ${payload.userName || "User"},\n\nYour withdrawal request of $${payload.amount} has been rejected. The funds have been restored to your balance.\n\nBest regards,\nMoneyMind Space Team`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #dc2626; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 18px; margin-top: 0;">Withdrawal Rejected</h2>
+        <p>Dear <strong>${payload.userName || "User"}</strong>,</p>
+        <p>We write to inform you that your withdrawal request has been rejected:</p>
+        <div style="background-color: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Amount:</strong> $${payload.amount}</p>
+          <p style="margin: 5px 0; font-size: 13px;"><strong>Status:</strong> Rejected & Restored</p>
+        </div>
+        <p style="font-size: 14px; color: #334155; line-height: 1.6;">The requested amount of $${payload.amount} has been restored to your account balance. If you believe this is in error, please review your payout details and resubmit, or contact live support.</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 25px;">
+          This is an automated system notification.
+        </p>
+      </div>
+    `;
   } else {
     return res.status(400).json({ error: "Invalid email notification type." });
   }

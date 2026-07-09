@@ -109,7 +109,7 @@ interface DashboardCardProps {
   deposits?: DepositLog[];
   withdrawals?: WithdrawalLog[];
   investments?: UserPlan[];
-  onCreateDeposit?: (amount: number, network: string, txHash: string) => Promise<void>;
+  onCreateDeposit?: (amount: number, network: string, txHash: string, screenshot?: string) => Promise<void>;
   onCreateWithdrawal?: (amount: number, network: string, wallet: string) => Promise<void>;
   onCreatePlan?: (planId: string, amount: number) => Promise<void>;
   onCancelPlan?: (invId: string) => Promise<void>;
@@ -729,7 +729,8 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
   // Form states
   const [depNetwork, setDepNetwork] = useState('BNB');
   const [depAmount, setDepAmount] = useState('');
-  const [depTxHash, setDepTxHash] = useState('');
+  const [depTxHash, setDepTxHash] = useState(''); // text Transaction ID
+  const [depScreenshot, setDepScreenshot] = useState(''); // screenshot Base64
   const [depError, setDepError] = useState('');
   const [depSuccess, setDepSuccess] = useState('');
 
@@ -739,7 +740,8 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
   const [pkDepAmount, setPkDepAmount] = useState('');
   const [pkDepSenderNumber, setPkDepSenderNumber] = useState('');
   const [pkDepSenderName, setPkDepSenderName] = useState('');
-  const [pkDepTxid, setPkDepTxid] = useState('');
+  const [pkDepTxid, setPkDepTxid] = useState(''); // text Transaction ID
+  const [pkDepScreenshot, setPkDepScreenshot] = useState(''); // screenshot Base64
   const [pkDepError, setPkDepError] = useState('');
   const [pkDepSuccess, setPkDepSuccess] = useState('');
   const [copiedPkDepNumber, setCopiedPkDepNumber] = useState(false);
@@ -837,8 +839,18 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
       return;
     }
 
-    if (!pkDepSenderNumber.trim() || !pkDepSenderName.trim() || !pkDepTxid.trim()) {
-      setPkDepError('❌ Please fill in all payment details and upload the payment screenshot.');
+    if (!pkDepSenderNumber.trim() || !pkDepSenderName.trim()) {
+      setPkDepError('❌ Please fill in your sender account number and title.');
+      return;
+    }
+
+    if (!pkDepTxid.trim()) {
+      setPkDepError('❌ Please enter your Transaction ID (TID) / Reference Number.');
+      return;
+    }
+
+    if (!pkDepScreenshot.trim()) {
+      setPkDepError('❌ Please upload a clear screenshot of the payment receipt.');
       return;
     }
 
@@ -846,13 +858,14 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     try {
       if (onCreateDeposit) {
         const depositDetails = `${pkDepMethod === 'EASYPAISA' ? 'Easypaisa' : pkDepMethod === 'JAZZCASH' ? 'JazzCash' : pkDepMethod === 'SADAPAY' ? 'SadaPay' : pkDepMethod === 'NAYAPAY' ? 'NayaPay' : 'Bank Transfer'} - Number: ${pkDepSenderNumber.trim()} | Name: ${pkDepSenderName.trim()}`;
-        await onCreateDeposit(amtUSD, pkDepMethod, `${pkDepTxid.trim()} (${depositDetails})`);
+        await onCreateDeposit(amtUSD, pkDepMethod, `${pkDepTxid.trim()} (${depositDetails})`, pkDepScreenshot);
         
         setPkDepSuccess('✅ Your deposit request has been submitted successfully. It will be credited after verification within 2 minutes to 2 hours.');
         setPkDepAmount('');
         setPkDepSenderNumber('');
         setPkDepSenderName('');
         setPkDepTxid('');
+        setPkDepScreenshot('');
       } else {
         setPkDepError('❌ Deposit system configuration issues. Please try again.');
       }
@@ -875,18 +888,25 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
       return;
     }
     const amtUSD = amtInput / conversionRate;
+
     if (!depTxHash.trim()) {
-      setDepError('Please upload the transaction receipt screenshot for validation.');
+      setDepError('Please enter the blockchain transaction hash / ID.');
+      return;
+    }
+
+    if (!depScreenshot.trim()) {
+      setDepError('Please upload a transaction receipt screenshot for verification.');
       return;
     }
 
     setSubmitting(true);
     try {
       if (onCreateDeposit) {
-        await onCreateDeposit(amtUSD, depNetwork, depTxHash.trim());
+        await onCreateDeposit(amtUSD, depNetwork, depTxHash.trim(), depScreenshot);
         setDepSuccess('Transaction Proof Submitted! Admin approval pending.');
         setDepAmount('');
         setDepTxHash('');
+        setDepScreenshot('');
       } else {
         setDepError('Deposit system configuration issue. Please try again.');
       }
@@ -2569,13 +2589,28 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                         {/* TXID / Ref receipt Number */}
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
+                            <span className="text-xs">🔑</span>
+                            <label className="block text-[9px] font-black text-white/70 uppercase tracking-widest">Transaction ID (TID) / Reference Number</label>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="e.g. 37829471928"
+                            value={pkDepTxid}
+                            onChange={(e) => setPkDepTxid(e.target.value)}
+                            className="w-full bg-slate-950/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20 transition-all shadow-inner shadow-black"
+                          />
+                        </div>
+
+                        {/* Payment Screenshot */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs">📸</span>
                             <label className="block text-[9px] font-black text-white/70 uppercase tracking-widest">Payment Screenshot</label>
                           </div>
-                          {pkDepTxid && pkDepTxid.startsWith('data:image/') ? (
+                          {pkDepScreenshot ? (
                             <div className="relative rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-2 flex flex-col items-center justify-center gap-3">
                                <div className="relative inline-block">
-                                 <img src={pkDepTxid} alt="Screenshot" className="max-h-32 object-contain rounded-lg border border-white/10" />
+                                 <img src={pkDepScreenshot} alt="Screenshot" className="max-h-32 object-contain rounded-lg border border-white/10" />
                                  <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-md border border-emerald-400 flex items-center gap-1">
                                    <CheckCircle className="w-3 h-3" />
                                    Attached
@@ -2583,7 +2618,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                                </div>
                                <button 
                                  type="button" 
-                                 onClick={() => setPkDepTxid('')}
+                                 onClick={() => setPkDepScreenshot('')}
                                  className="text-[10px] text-red-400 font-bold hover:text-red-300 transition-colors bg-red-400/10 px-3 py-1.5 rounded-lg"
                                >
                                  Remove Screenshot
@@ -2594,14 +2629,14 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                 <Upload className="w-5 h-5 text-white/40 mb-2 group-hover:text-emerald-500/70 transition-colors" />
                                 <p className="text-[10px] text-white/50 uppercase tracking-wider font-bold">
-                                  Click to upload receipt
+                                  Click to upload payment receipt
                                 </p>
                               </div>
                               <input
                                 type="file"
                                 className="hidden"
                                 accept="image/*"
-                                onChange={(e) => handleScreenshotUpload(e, setPkDepTxid, setPkDepError)}
+                                onChange={(e) => handleScreenshotUpload(e, setPkDepScreenshot, setPkDepError)}
                               />
                             </label>
                           )}
@@ -2727,13 +2762,28 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                         {/* Tx Hash proof */}
                         <div className="space-y-1.5 bg-transparent">
                           <div className="flex items-center gap-1.5">
+                            <span className="text-sm">🔑</span>
+                            <label className="block text-[9px] font-black text-white/70 uppercase tracking-widest">Transaction Hash / ID</label>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="e.g. 0x82f... or TRX transfer TxID"
+                            value={depTxHash}
+                            onChange={(e) => setDepTxHash(e.target.value)}
+                            className="w-full bg-slate-950/80 border border-white/10 rounded-xl p-3.5 text-xs text-white placeholder-white/25 outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-inner shadow-black"
+                          />
+                        </div>
+
+                        {/* Screenshot Proof */}
+                        <div className="space-y-1.5 bg-transparent">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-sm">📸</span>
                             <label className="block text-[9px] font-black text-white/70 uppercase tracking-widest">Transaction Receipt Screenshot</label>
                           </div>
-                          {depTxHash && depTxHash.startsWith('data:image/') ? (
+                          {depScreenshot ? (
                             <div className="relative rounded-xl border border-blue-500/30 bg-blue-600/5 p-2 flex flex-col items-center justify-center gap-3">
                                <div className="relative inline-block">
-                                 <img src={depTxHash} alt="Screenshot" className="max-h-32 object-contain rounded-lg border border-white/10" />
+                                 <img src={depScreenshot} alt="Screenshot" className="max-h-32 object-contain rounded-lg border border-white/10" />
                                  <div className="absolute top-2 right-2 bg-blue-600 text-black text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-md border border-amber-300 flex items-center gap-1">
                                    <CheckCircle className="w-3 h-3" />
                                    Attached
@@ -2741,7 +2791,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                                </div>
                                <button 
                                  type="button" 
-                                 onClick={() => setDepTxHash('')}
+                                 onClick={() => setDepScreenshot('')}
                                  className="text-[10px] text-red-400 font-bold hover:text-red-300 transition-colors bg-red-400/10 px-3 py-1.5 rounded-lg"
                                >
                                  Remove Screenshot
@@ -2759,7 +2809,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                                 type="file"
                                 className="hidden"
                                 accept="image/*"
-                                onChange={(e) => handleScreenshotUpload(e, setDepTxHash, setDepError)}
+                                onChange={(e) => handleScreenshotUpload(e, setDepScreenshot, setDepError)}
                               />
                             </label>
                           )}

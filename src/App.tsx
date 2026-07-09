@@ -1090,7 +1090,7 @@ export default function App() {
   };
 
   // Submit a deposit record
-  const handleCreateDeposit = async (amount: number, network: string, txHash: string) => {
+  const handleCreateDeposit = async (amount: number, network: string, txHash: string, screenshot?: string) => {
     if (!currentUid) return;
     try {
       const depositRef = doc(collection(db, 'users', currentUid, 'deposits'));
@@ -1110,11 +1110,13 @@ export default function App() {
         amount,
         network,
         txHash,
+        screenshot: screenshot || "",
         status: 'pending',
         createdAt: serverTimestamp(),
         timestamp: timestampStr,
         userId: currentUid,
-        userName: userProfile?.name || "User"
+        userName: userProfile?.name || "User",
+        email: userProfile?.email || "N/A"
       });
       
       // Dispatch administration email alert
@@ -1172,6 +1174,17 @@ export default function App() {
     }
 
     try {
+      const now = new Date();
+      const timestampStr = now.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' ' + now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', currentUid!);
         const withdrawRef = doc(collection(db, 'users', currentUid!, 'withdrawals'));
@@ -1197,22 +1210,14 @@ export default function App() {
           network,
           status: 'pending',
           createdAt: serverTimestamp(),
+          timestamp: timestampStr,
           userId: currentUid,
-          userName: userProfile?.name || "User"
+          userName: userProfile?.name || "User",
+          email: userProfile?.email || "N/A"
         });
       });
 
       // Dispatch administration email alert
-      const now = new Date();
-      const timestampStr = now.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      }) + ' ' + now.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
       const targetAdminEmail = globalSettings?.adminEmail || "danishrehmani72@gmail.com";
       fetch('/api/send-email', {
         method: 'POST',
@@ -1264,30 +1269,84 @@ export default function App() {
     amount: number
   ) => {
     try {
+      let recipientEmail = '';
+      let recipientName = '';
+      let paymentMethod = '';
+      let txDate = '';
+
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', userId);
         const txRef = doc(db, 'users', userId, type === 'deposit' ? 'deposits' : 'withdrawals', txId);
         
-        const userDoc = await transaction.get(userRef);
+        const [userDoc, txDoc] = await Promise.all([
+          transaction.get(userRef),
+          transaction.get(txRef)
+        ]);
+
         if (!userDoc.exists()) throw new Error("User not found");
+        if (!txDoc.exists()) throw new Error("Transaction record not found");
         
         const userData = userDoc.data() as UserProfile;
+        const txData = txDoc.data();
 
-        if (status === 'rejected') {
-          // Restore balance if rejected
-          const currentBalance = userData.dailyBonusEarnings || 0;
-          transaction.update(userRef, {
-            dailyBonusEarnings: currentBalance + amount,
-            updatedAt: serverTimestamp()
-          });
+        recipientEmail = txData?.email || userData?.email || '';
+        recipientName = txData?.userName || userData?.name || 'User';
+        paymentMethod = txData?.network || 'N/A';
+        txDate = txData?.timestamp || '';
+
+        const currentBalance = userData.dailyBonusEarnings || 0;
+
+        if (type === 'deposit') {
+          if (status === 'approved') {
+            // Credit user's balance on deposit approval
+            transaction.update(userRef, {
+              dailyBonusEarnings: currentBalance + amount,
+              updatedAt: serverTimestamp()
+            });
+          }
+        } else {
+          // Withdrawal
+          if (status === 'rejected') {
+            // Restore balance if withdrawal is rejected
+            transaction.update(userRef, {
+              dailyBonusEarnings: currentBalance + amount,
+              updatedAt: serverTimestamp()
+            });
+          }
         }
         
-        transaction.update(txRef, { status });
+        transaction.update(txRef, { 
+          status,
+          updatedAt: serverTimestamp()
+        });
       });
-      addToast(`Withdrawal ${status} successfully!`, 'success');
-    } catch (error) {
+
+      // Send status update email to user
+      if (recipientEmail) {
+        const emailType = type === 'deposit' 
+          ? (status === 'approved' ? 'deposit_approved' : 'deposit_rejected')
+          : (status === 'approved' ? 'withdrawal_approved' : 'withdrawal_rejected');
+
+        fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: emailType,
+            to: recipientEmail,
+            payload: {
+              userName: recipientName,
+              amount: amount,
+              paymentMethod: paymentMethod,
+              date: txDate
+            }
+          })
+        }).catch(err => console.error("Email notification dispatch error on status update:", err));
+      }
+
+      addToast(`${type === 'deposit' ? 'Deposit' : 'Withdrawal'} request has been ${status}!`, 'success');
+    } catch (error: any) {
       console.error(error);
-      addToast(`Error updating transaction status`, 'error');
+      addToast(error.message || `Error updating transaction status`, 'error');
     }
   };
 
