@@ -1482,8 +1482,9 @@ export default function App() {
         timestamp: timestampStr
       });
       addToast(`Investment Plan Activated successfully!`, 'success');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${currentUid}/investments`);
+    } catch (error: any) {
+      console.error("Error creating plan:", error);
+      addToast(error?.message || "Failed to activate investment plan. Please try again.", "error");
     }
   };
 
@@ -1509,8 +1510,9 @@ export default function App() {
         cancelledAt: serverTimestamp()
       }, { merge: true });
       addToast(`Investment Plan Cancelled. Original principal has been returned to your wallet.`, 'success');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${currentUid}/investments/${invId}`);
+    } catch (error: any) {
+      console.error("Error cancelling plan:", error);
+      addToast(error?.message || "Failed to cancel investment plan. Please try again.", "error");
     }
   };
 

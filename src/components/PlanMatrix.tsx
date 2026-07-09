@@ -48,10 +48,15 @@ export function PlanMatrix({ balance, investments, onCreatePlan, onCancelPlan, c
     }
     
     setIsLoading(true);
-    await onCreatePlan(selectedPlan.id, amt);
-    setIsLoading(false);
-    setSelectedPlan(null);
-    setDepositAmount('');
+    try {
+      await onCreatePlan(selectedPlan.id, amt);
+      setSelectedPlan(null);
+      setDepositAmount('');
+    } catch (err: any) {
+      setError(err.message || "Failed to activate investment plan. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -53,7 +53,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -261,7 +261,9 @@ export default function DashboardCard({
         setUploadProgress(50);
         
         try {
-          await addDoc(collection(db, 'task_submissions'), {
+          const submissionRef = doc(collection(db, 'task_submissions'));
+          await setDoc(submissionRef, {
+            id: submissionRef.id,
             userId,
             username: userProfile.name,
             taskId: selectedTaskForSubmission.id,

@@ -53,12 +53,12 @@ service cloud.firestore {
 
     // Helper to validate DailyReward log schema
     function isValidDailyReward(log) {
-      return log.keys().hasAll(['id', 'amount', 'streak', 'timestamp', 'createdAt'])
+      return log.keys().hasAll(['id', 'amount', 'timestamp', 'createdAt'])
         && log.keys().size() <= 6
         && log.id is string
         && log.id.size() <= 128
         && log.amount is number
-        && log.streak is number
+        && (!log.keys().hasAny(['streak']) || log.streak is number)
         && log.timestamp is string
         && log.timestamp.size() <= 64;
     }
@@ -80,7 +80,7 @@ service cloud.firestore {
         && sub.taskId is string
         && sub.screenshot is string
         && sub.status in ['Pending', 'Approved', 'Rejected']
-        && sub.submissionTime is string;
+        && (sub.submissionTime is string || sub.submissionTime is timestamp);
     }
 
     function isAdmin() {
