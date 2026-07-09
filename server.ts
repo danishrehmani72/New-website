@@ -293,7 +293,12 @@ app.post("/api/otp/send", async (req, res) => {
   try {
     const result = await sendGeneralEmail({ to: cleanEmail, subject, text, html });
     if (result.success) {
-      return res.json({ success: true, mode: result.provider === "demo" ? "demo" : "live", cooldownSeconds: 60 });
+      return res.json({ 
+        success: true, 
+        mode: result.provider === "demo" ? "demo" : "live", 
+        cooldownSeconds: 60,
+        code: result.provider === "demo" ? code : undefined
+      });
     } else {
       console.warn(`[OTP System] OTP delivery failed, returning demo code: ${result.error}`);
       return res.json({ 
