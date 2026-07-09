@@ -147,7 +147,34 @@ function CountUpNum({ value, duration = 1500, suffix = "" }: { value: number; du
 export default function App() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [isUnblocking, setIsUnblocking] = useState(false);
+
+  // Safety timeout for connection configurations to prevent white/black screen deadlocks
+  useEffect(() => {
+    if (!loading) {
+      setLoadingTimeout(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (loading) {
+        setLoadingTimeout(true);
+      }
+    }, 4000); // 4 seconds before showing the escape option
+
+    const autoClearTimer = setTimeout(() => {
+      if (loading) {
+        console.warn("Connection safety timeout auto-resolving to prevent deadlock...");
+        setLoading(false);
+      }
+    }, 12000); // 12 seconds before auto-clearing loading to let the user see the main page / login page
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(autoClearTimer);
+    };
+  }, [loading]);
+
   const [currentUid, setCurrentUid] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [logs, setLogs] = useState<ReferralLog[]>([]);
@@ -1607,12 +1634,30 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-[#E5E7EB] flex items-center justify-center font-sans antialiased">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen bg-[#0A0A0A] text-[#E5E7EB] flex items-center justify-center font-sans antialiased px-4">
+        <div className="text-center space-y-6 max-w-sm">
           <div className="w-10 h-10 border-2 border-blue-500/30 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-400 font-semibold animate-pulse">
-            Configuring Secured Connection...
-          </p>
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.2em] text-blue-400 font-semibold animate-pulse">
+              Configuring Secured Connection...
+            </p>
+            {loadingTimeout && (
+              <p className="text-[10px] text-white/40 leading-relaxed animate-fade-in px-4">
+                This is taking longer than usual. There may be a connection delay or temporary network sync issue.
+              </p>
+            )}
+          </div>
+          
+          {loadingTimeout && (
+            <div className="pt-2 animate-fade-in">
+              <button 
+                onClick={handleSignOut}
+                className="px-4 py-2 text-[10px] uppercase font-bold text-blue-400 hover:text-blue-300 tracking-wider bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <span>Reset Connection & Sign Out</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
