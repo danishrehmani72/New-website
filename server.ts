@@ -300,23 +300,14 @@ app.post("/api/otp/send", async (req, res) => {
         code: result.provider === "demo" ? code : undefined
       });
     } else {
-      console.warn(`[OTP System] OTP delivery failed, returning demo code: ${result.error}`);
-      return res.json({ 
-        success: true, 
-        mode: "demo", 
-        cooldownSeconds: 60,
-        message: "Delivery fallback active.",
-        code: code 
+      return res.status(400).json({ 
+        error: result.error || "Email delivery failed." 
       });
     }
   } catch (err: any) {
     console.error("[OTP System] Delivery error:", err);
-    return res.json({ 
-      success: true, 
-      mode: "demo", 
-      cooldownSeconds: 60,
-      message: "Delivery fallback active.",
-      code: code
+    return res.status(500).json({ 
+      error: err.message || "An unexpected error occurred in the delivery system." 
     });
   }
 });
@@ -611,9 +602,18 @@ async function sendGeneralEmail({
       return { success: false, provider: "resend", error: errMsg };
     }
   } else {
-    console.log(`[Email System] No SMTP or RESEND_API_KEY is configured. Preserving message in simulated demo logs.`);
-    await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (No SMTP or RESEND_API_KEY)");
-    return { success: true, provider: "demo", note: "Simulated mail logs created" };
+    console.log(`[Email System] No SMTP or RESEND_API_KEY is configured.`);
+    const targetLower = to.toLowerCase().trim();
+    if (
+      targetLower.includes("no-email") || 
+      targetLower.endsWith("@wealthhub.com") || 
+      targetLower.endsWith("@moneymindspace.com") || 
+      !targetLower.includes("@")
+    ) {
+      await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (No SMTP or RESEND_API_KEY)");
+      return { success: true, provider: "demo", note: "Simulated mail logs created" };
+    }
+    return { success: false, error: "Email delivery failed: Neither SMTP nor RESEND_API_KEY is configured on the server." };
   }
 }
 

@@ -259,8 +259,17 @@ async function sendGeneralEmail({
       return { success: false, provider: "resend", error: errMsg };
     }
   } else {
-    await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (No SMTP or RESEND_API_KEY)");
-    return { success: true, provider: "demo" };
+    const targetLower = to.toLowerCase().trim();
+    if (
+      targetLower.includes("no-email") || 
+      targetLower.endsWith("@wealthhub.com") || 
+      targetLower.endsWith("@moneymindspace.com") || 
+      !targetLower.includes("@")
+    ) {
+      await logEmailDelivery(to, `${subject} (Simulated Demo)`, "success", "Simulated delivery (No SMTP or RESEND_API_KEY)");
+      return { success: true, provider: "demo" };
+    }
+    return { success: false, error: "Email delivery failed: Neither SMTP nor RESEND_API_KEY is configured on the server." };
   }
 }
 
@@ -345,21 +354,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         code: result.provider === "demo" ? code : undefined
       });
     } else {
-      return res.json({ 
-        success: true, 
-        mode: "demo", 
-        cooldownSeconds: 60,
-        message: "Delivery fallback active.",
-        code: code 
+      return res.status(400).json({ 
+        error: result.error || "Email delivery failed." 
       });
     }
   } catch (err: any) {
-    return res.json({ 
-      success: true, 
-      mode: "demo", 
-      cooldownSeconds: 60,
-      message: "Delivery fallback active.",
-      code: code
+    return res.status(500).json({ 
+      error: err.message || "An unexpected error occurred in the delivery system." 
     });
   }
 }
