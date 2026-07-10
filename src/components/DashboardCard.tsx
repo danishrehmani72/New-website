@@ -948,7 +948,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     setWithdrawSuccess('');
 
     if (isFreeUserWithNoDeposit) {
-      setWithdrawError('❌ Withdrawals are disabled for free users. Please deposit at least $10.00 to activate withdrawals.');
+      setWithdrawError('Please make and receive approval for at least one deposit before requesting a withdrawal.');
       return;
     }
 
@@ -1011,7 +1011,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     setPkWithdrawSuccess('');
 
     if (isFreeUserWithNoDeposit) {
-      setPkWithdrawError('❌ Withdrawals are disabled for free users. Please deposit at least $10.00 to activate withdrawals.');
+      setPkWithdrawError('Please make and receive approval for at least one deposit before requesting a withdrawal.');
       return;
     }
 
@@ -2993,7 +2993,7 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                       <div className="space-y-1.5">
                         <h4 className="text-sm font-extrabold text-white uppercase tracking-wider">🔒 Withdrawal Locked</h4>
                         <p className="text-xs text-white/75 leading-relaxed max-w-sm mx-auto">
-                          Withdrawals are currently locked for free accounts. Please deposit at least <strong>$10.00</strong> to activate your account and unlock the withdrawal gateway.
+                          Please make and receive approval for at least one deposit before requesting a withdrawal.
                         </p>
                       </div>
                       <div className="pt-2">

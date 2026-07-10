@@ -11,6 +11,9 @@ export interface RecentWithdrawalRecord {
   timestamp: string;
   userInitial: string;
   status?: string;
+  userId?: string;
+  userName?: string;
+  email?: string;
 }
 
 interface RecentWithdrawalToastProps {

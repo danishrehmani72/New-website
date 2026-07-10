@@ -290,7 +290,10 @@ export default function App() {
           wallet: d.wallet || "",
           timestamp: d.timestamp || "Just now",
           userInitial,
-          status: d.status || statusVal
+          status: d.status || statusVal,
+          userId: d.userId || docSnap.ref.parent?.parent?.id || "",
+          userName: d.userName || "",
+          email: d.email || ""
         });
       });
       return list;
@@ -1197,7 +1200,13 @@ export default function App() {
     // Guard for free users who have not deposited
     const hasApprovedDeposit = deposits && deposits.some(d => d.status === 'approved');
     if (!hasApprovedDeposit) {
-      addToast("Withdrawals are only available for deposited accounts. Please deposit at least $10.00 to activate withdrawals.", "error");
+      addToast("Please make and receive approval for at least one deposit before requesting a withdrawal.", "error");
+      return;
+    }
+
+    // Dynamic balance check before requesting
+    if (amount > balance) {
+      addToast("Insufficient balance to request this withdrawal.", "error");
       return;
     }
 
@@ -1225,17 +1234,6 @@ export default function App() {
         
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists()) throw new Error("User not found");
-        
-        const userData = userDoc.data() as UserProfile;
-        
-        if ((userData.dailyBonusEarnings || 0) < amount) {
-          throw new Error("Insufficient balance");
-        }
-        
-        transaction.update(userRef, {
-            dailyBonusEarnings: (userData.dailyBonusEarnings || 0) - amount,
-            updatedAt: serverTimestamp()
-        });
         
         transaction.set(withdrawRef, {
           id: withdrawRef.id,
@@ -1338,20 +1336,25 @@ export default function App() {
               updatedAt: serverTimestamp()
             });
           }
-        } else {
-          // Withdrawal
-          if (status === 'rejected') {
-            // Restore balance if withdrawal is rejected
-            transaction.update(userRef, {
-              dailyBonusEarnings: currentBalance + amount,
-              updatedAt: serverTimestamp()
-            });
-          }
         }
         
         transaction.update(txRef, { 
           status,
           updatedAt: serverTimestamp()
+        });
+
+        // Atomic audit log registration
+        const auditRef = doc(collection(db, 'audit_logs'));
+        transaction.set(auditRef, {
+          id: auditRef.id,
+          action: status.toUpperCase(),
+          type,
+          txId,
+          targetUserId: userId,
+          amount,
+          timestamp: new Date().toISOString(),
+          operatorId: currentUid || 'anonymous-admin',
+          createdAt: serverTimestamp()
         });
       });
 
@@ -1702,6 +1705,7 @@ export default function App() {
   const approvedDepositsList = deposits.filter(d => d.status === 'approved');
   const approvedDeposits = approvedDepositsList.reduce((sum, d) => sum + d.amount, 0);
   const approvedWithdrawals = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0);
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0);
   const dailyBonusEarnings = userProfile?.dailyBonusEarnings !== undefined ? userProfile.dailyBonusEarnings : 0;
   const approvedTaskRewards = taskSubmissions
     .filter(s => s.status === 'Approved' && s.userId === currentUid)
@@ -1812,7 +1816,7 @@ export default function App() {
     .filter(i => i.status === 'active')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const balance = signupBonus + referralEarnings + approvedDeposits - approvedWithdrawals + dailyBonusEarnings + investmentProfits + approvedTaskRewards - activeInvestmentsSum;
+  const balance = signupBonus + referralEarnings + approvedDeposits - approvedWithdrawals - pendingWithdrawals + dailyBonusEarnings + investmentProfits + approvedTaskRewards - activeInvestmentsSum;
 
   if (userProfile?.blocked) {
     const handleSandboxUnblock = async () => {
