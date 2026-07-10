@@ -23,6 +23,7 @@ import {
   LogOut,
   HelpCircle,
   Sparkles,
+  Lock,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -173,6 +174,27 @@ export default function DashboardCard({
   setTheme: setThemeProp,
 }: DashboardCardProps) {
   const hasDeposited = deposits && deposits.length > 0;
+  const hasApprovedDeposit = deposits && deposits.some(d => d.status === 'approved');
+  const isFreeUserWithNoDeposit = !hasApprovedDeposit;
+
+  const latestDeposit = useMemo(() => {
+    if (!deposits || deposits.length === 0) return null;
+    return [...deposits].sort((a, b) => {
+      const timeA = a.createdAt?.seconds 
+        ? a.createdAt.seconds * 1000 
+        : (a.createdAt instanceof Date ? a.createdAt.getTime() : (a.timestamp ? new Date(a.timestamp).getTime() : 0));
+      const timeB = b.createdAt?.seconds 
+        ? b.createdAt.seconds * 1000 
+        : (b.createdAt instanceof Date ? b.createdAt.getTime() : (b.timestamp ? new Date(b.timestamp).getTime() : 0));
+      return timeB - timeA;
+    })[0];
+  }, [deposits]);
+
+  const totalApprovedDepositAmount = useMemo(() => {
+    return deposits ? deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + d.amount, 0) : 0;
+  }, [deposits]);
+
+  const withdrawalActivationPercentage = Math.min(100, Math.max(0, (totalApprovedDepositAmount / 10) * 100));
   const [copied, setCopied] = useState(false);
   const [activeTabLocal, setActiveTabLocal] = useState<'overview' | 'funding' | 'faq' | 'settings' | 'security'>('overview');
   const [showDepositSheet, setShowDepositSheet] = useState(false);
@@ -925,6 +947,11 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     setWithdrawError('');
     setWithdrawSuccess('');
 
+    if (isFreeUserWithNoDeposit) {
+      setWithdrawError('❌ Withdrawals are disabled for free users. Please deposit at least $10.00 to activate withdrawals.');
+      return;
+    }
+
     const amtInput = parseFloat(withdrawAmount);
     if (!amtInput || amtInput <= 0) {
       setWithdrawError('Please enter a valid positive withdrawal amount.');
@@ -982,6 +1009,11 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     e.preventDefault();
     setPkWithdrawError('');
     setPkWithdrawSuccess('');
+
+    if (isFreeUserWithNoDeposit) {
+      setPkWithdrawError('❌ Withdrawals are disabled for free users. Please deposit at least $10.00 to activate withdrawals.');
+      return;
+    }
 
     const amtInput = parseFloat(pkWithdrawAmount);
     const amtUSD = amtInput / conversionRate;
@@ -1659,6 +1691,126 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                     <RefreshCw className="w-2.5 h-2.5 shrink-0 animate-spin" />
                     <span>Track progress stepper</span>
                   </button>
+                </div>
+              </div>
+
+              {/* 💳 DEPOSIT STATUS & WITHDRAWAL ELIGIBILITY CARD */}
+              <div className="bg-white dark:bg-[#0f1016] border border-gray-150/80 dark:border-white/5 rounded-2xl p-5 text-left relative overflow-hidden shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center shrink-0">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-white leading-tight">Deposit & Withdrawal Status</h4>
+                      <p className="text-[9px] text-slate-400 dark:text-white/30 uppercase tracking-widest font-semibold">Live Verification & Eligibility Tracker</p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-[8px] uppercase tracking-wider font-extrabold text-blue-500 dark:text-blue-400 border border-blue-500/10">
+                    Real-time
+                  </span>
+                </div>
+
+                {latestDeposit ? (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-gray-150 dark:border-white/5 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 dark:text-white/40 font-semibold">Latest Deposit Attempt</span>
+                      <span className="text-slate-400 dark:text-white/30 text-[10px] font-mono">
+                        {latestDeposit.timestamp || 'Just now'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-[#12141f] border border-gray-100 dark:border-white/[0.03]">
+                      <div className="space-y-1">
+                        <p className="text-xs font-extrabold text-slate-800 dark:text-white">
+                          {currencySymbol}{(latestDeposit.amount * conversionRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-white/40">
+                          Via {latestDeposit.network} • Tx: <span className="font-mono text-[9px]">{latestDeposit.txHash ? `${latestDeposit.txHash.slice(0, 6)}...${latestDeposit.txHash.slice(-6)}` : 'N/A'}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {latestDeposit.status === 'pending' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            <Clock className="w-3 h-3 animate-spin" />
+                            Pending Approval
+                          </span>
+                        )}
+                        {latestDeposit.status === 'approved' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <CheckCircle className="w-3 h-3" />
+                            Approved
+                          </span>
+                        )}
+                        {latestDeposit.status === 'rejected' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                            <XCircle className="w-3 h-3" />
+                            Rejected
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-rose-500/5 border border-rose-500/10 text-center space-y-2">
+                    <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">⚠️ No Deposit Found</p>
+                    <p className="text-[10px] text-slate-400 dark:text-white/40 max-w-xs mx-auto leading-relaxed">
+                      You have not submitted any deposit attempts yet. Please submit a deposit to activate your account.
+                    </p>
+                  </div>
+                )}
+
+                {/* 📊 Withdrawal Eligibility Progress Bar */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600 dark:text-white/60 font-bold flex items-center gap-1">
+                      {hasApprovedDeposit ? (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <span className="text-emerald-500 font-extrabold">Withdrawal Ready</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>Eligibility Progress</span>
+                        </>
+                      )}
+                    </span>
+                    <span className="font-mono text-[10.5px] text-slate-800 dark:text-white font-extrabold">
+                      {currencySymbol}{(totalApprovedDepositAmount * conversionRate).toFixed(2)} / {currencySymbol}{(10 * conversionRate).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-gray-100 dark:bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-gray-200 dark:border-white/5 relative">
+                    <div
+                      style={{ width: `${withdrawalActivationPercentage}%` }}
+                      className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(59,130,246,0.5)] ${
+                        hasApprovedDeposit
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                          : 'bg-gradient-to-r from-blue-600 to-blue-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex items-start gap-1.5 pt-1">
+                    <div className="mt-0.5 shrink-0">
+                      {hasApprovedDeposit ? (
+                        <CheckCircle className="w-3 h-3 text-emerald-500" />
+                      ) : (
+                        <Lock className="w-3 h-3 text-amber-500" />
+                      )}
+                    </div>
+                    <p className="text-[9.5px] text-slate-400 dark:text-white/50 leading-normal">
+                      {hasApprovedDeposit ? (
+                        <span className="text-emerald-500/90 font-bold">Congratulation! Your account is activated for withdrawals.</span>
+                      ) : latestDeposit?.status === 'pending' ? (
+                        <span>Your deposit of {currencySymbol}{(latestDeposit.amount * conversionRate).toFixed(2)} is pending approval. Once approved, your withdrawal eligibility will update.</span>
+                      ) : (
+                        <span>You need an approved deposit of at least <strong className="text-slate-700 dark:text-white font-black">$10.00 ({currencySymbol}{(10 * conversionRate).toFixed(0)})</strong> to unlock withdrawals.</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -2833,7 +2985,35 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                     </p>
                   </div>
 
-                  {/* Custom Navigation Tab Toggle Bar */}
+                  {isFreeUserWithNoDeposit ? (
+                    <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-4 my-4">
+                      <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mx-auto">
+                        <Lock className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h4 className="text-sm font-extrabold text-white uppercase tracking-wider">🔒 Withdrawal Locked</h4>
+                        <p className="text-xs text-white/75 leading-relaxed max-w-sm mx-auto">
+                          Withdrawals are currently locked for free accounts. Please deposit at least <strong>$10.00</strong> to activate your account and unlock the withdrawal gateway.
+                        </p>
+                      </div>
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const depSec = document.getElementById('deposit-section');
+                            if (depSec) {
+                              depSec.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:brightness-110 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-1.5 border-0 shadow-lg shadow-emerald-500/15"
+                        >
+                          <span>💳 Deposit $10 Now</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Custom Navigation Tab Toggle Bar */}
                   <div className="bg-slate-950/60 border border-white/5 p-1 rounded-xl grid grid-cols-2 gap-1.5 shadow-inner shadow-black">
                     <button
                       type="button"
@@ -3256,6 +3436,8 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                         </button>
                       </form>
                     </motion.div>
+                  )}
+                    </>
                   )}
                 </div>
 

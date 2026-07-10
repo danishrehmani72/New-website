@@ -1194,6 +1194,13 @@ export default function App() {
   const handleCreateWithdrawal = async (amount: number, network: string, wallet: string) => {
     if (!currentUid) return;
 
+    // Guard for free users who have not deposited
+    const hasApprovedDeposit = deposits && deposits.some(d => d.status === 'approved');
+    if (!hasApprovedDeposit) {
+      addToast("Withdrawals are only available for deposited accounts. Please deposit at least $10.00 to activate withdrawals.", "error");
+      return;
+    }
+
     // Withdrawal Protection for suspicious or blocked accounts
     if (userProfile?.blocked || userProfile?.isSuspicious) {
       addToast("Your account is under security review. ", "error");
