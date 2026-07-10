@@ -899,7 +899,8 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
       }
     } catch (err: any) {
       console.error('Deposit submission error:', err);
-      setPkDepError(`❌ Could not save deposit request: ${err.message || 'Unknown error'}`);
+      const errorMessage = err.message || JSON.stringify(err) || 'Unknown error';
+      setPkDepError(`❌ Could not save deposit request: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }
