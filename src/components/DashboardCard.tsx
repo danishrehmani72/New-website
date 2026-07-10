@@ -74,6 +74,7 @@ import { AvatarIcon, getAvatarConfig, AVATAR_PRESETS } from '../lib/avatars';
 
 import { PlanMatrix } from './PlanMatrix';
 import { playSound } from '../lib/sounds';
+import { ActivityHistory } from './ActivityHistory';
 
 export function getPlanCapPercent(planId: string, amount: number): number {
   const normId = (planId || '').toLowerCase().trim();
@@ -3871,9 +3872,13 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                       } finally {
                         setIsSavingProfile(false);
                       }
-                    }} 
-                    className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+                    }}
+                    className="space-y-6"
                   >
+                    {/* ... form content ... */}
+                  </form>
+                  <ActivityHistory userId={userId} />
+
                     {/* Left Column: Input and Save Button */}
                     <div className="lg:col-span-5 space-y-6 flex flex-col justify-between">
                       <div className="space-y-4">
