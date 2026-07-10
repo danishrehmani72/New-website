@@ -1337,19 +1337,7 @@ export default function App() {
             });
           }
         } else if (type === 'withdrawal') {
-          if (status === 'approved') {
-            // Deduct user's balance on withdrawal approval
-            transaction.update(userRef, {
-              dailyBonusEarnings: currentBalance - amount,
-              updatedAt: serverTimestamp()
-            });
-          } else if (status === 'rejected') {
-            // Restore balance if withdrawal is rejected
-            transaction.update(userRef, {
-              dailyBonusEarnings: currentBalance + amount,
-              updatedAt: serverTimestamp()
-            });
-          }
+          // No balance update needed here as the balance is calculated from deposits/withdrawals history
         }
         
         transaction.update(txRef, { 
