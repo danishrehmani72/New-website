@@ -470,7 +470,7 @@ export default function DashboardCard({
 
   // ⚡ CUSTOM INTERACTIVE HANDLERS FOR REDESIGNED POPUPS
   const handleTaskClick = async (taskId: string, link: string, rewardPKR: number) => {
-    if (completedTasks.includes(taskId)) return;
+    if ((completedTasks || []).includes(taskId)) return;
     setVerifyingTaskId(taskId);
     setTaskProgress(0);
     window.open(link, '_blank');
@@ -559,7 +559,7 @@ export default function DashboardCard({
       return;
     }
     
-    if (userProfile?.usedGiftCodes?.includes(code)) {
+    if ((userProfile?.usedGiftCodes || []).includes(code)) {
       onAddToast("You have already redeemed this gift code.", "error");
       return;
     }

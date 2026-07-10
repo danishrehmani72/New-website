@@ -101,6 +101,21 @@ export default function AdminPanel({
   const [txSearchText, setTxSearchText] = useState('');
   const [filterType, setFilterType] = useState<'deposits' | 'withdrawals'>('deposits');
   const [filterWStatus, setFilterWStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const handleTxAction = async (type: 'deposit' | 'withdrawal', txId: string, status: 'approved' | 'rejected', userId: string, amount: number) => {
+    setProcessingId(txId);
+    try {
+      await onUpdateTxStatus(type, txId, status, userId, amount);
+    } catch (error: any) {
+      console.error(error);
+      // Assuming toast is available globally or imported
+      // toast.error(error.message || "Unexpected Error");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -109,11 +124,11 @@ export default function AdminPanel({
   // Memoized Filtered Deposits
   const filteredDeposits = useMemo(() => {
     return deposits.filter(d => {
-      const searchMatch = !txSearchText.trim() || 
-        (d.userId && d.userId.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (d.userName && d.userName.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (d.email && d.email.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (d.txHash && d.txHash.toLowerCase().includes(txSearchText.toLowerCase()));
+      const searchMatch = !(txSearchText || "").trim() || 
+        ((d.userId || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((d.userName || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((d.email || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((d.txHash || "").toLowerCase()).includes((txSearchText || "").toLowerCase());
       
       const statusMatch = filterWStatus === 'all' || d.status === filterWStatus;
       return searchMatch && statusMatch;
@@ -123,11 +138,11 @@ export default function AdminPanel({
   // Memoized Filtered Withdrawals
   const filteredWithdrawals = useMemo(() => {
     return withdrawals.filter(w => {
-      const searchMatch = !txSearchText.trim() || 
-        (w.userId && w.userId.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (w.userName && w.userName.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (w.email && w.email.toLowerCase().includes(txSearchText.toLowerCase())) ||
-        (w.wallet && w.wallet.toLowerCase().includes(txSearchText.toLowerCase()));
+      const searchMatch = !(txSearchText || "").trim() || 
+        ((w.userId || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((w.userName || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((w.email || "").toLowerCase()).includes((txSearchText || "").toLowerCase()) ||
+        ((w.wallet || "").toLowerCase()).includes((txSearchText || "").toLowerCase());
       
       const statusMatch = filterWStatus === 'all' || w.status === filterWStatus;
       return searchMatch && statusMatch;

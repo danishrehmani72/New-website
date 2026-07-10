@@ -119,7 +119,7 @@ export default function RegistrationCard({ referredBy, referredSource, inviterNa
   };
 
   const handleSendVerificationCode = async () => {
-    if (!email.trim() || !email.includes('@') || email.trim().length < 5) {
+    if (!email.trim() || !((email || "").includes('@')) || email.trim().length < 5) {
       setError('Please enter a valid email address.');
       return;
     }

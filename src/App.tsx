@@ -1336,6 +1336,20 @@ export default function App() {
               updatedAt: serverTimestamp()
             });
           }
+        } else if (type === 'withdrawal') {
+          if (status === 'approved') {
+            // Deduct user's balance on withdrawal approval
+            transaction.update(userRef, {
+              dailyBonusEarnings: currentBalance - amount,
+              updatedAt: serverTimestamp()
+            });
+          } else if (status === 'rejected') {
+            // Restore balance if withdrawal is rejected
+            transaction.update(userRef, {
+              dailyBonusEarnings: currentBalance + amount,
+              updatedAt: serverTimestamp()
+            });
+          }
         }
         
         transaction.update(txRef, { 
