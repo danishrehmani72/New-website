@@ -882,9 +882,11 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
     setSubmitting(true);
     try {
       if (onCreateDeposit) {
+        console.log('Starting deposit submission:', { amtUSD, pkDepMethod, pkDepTxid });
         const depositDetails = `${pkDepMethod === 'EASYPAISA' ? 'Easypaisa' : pkDepMethod === 'JAZZCASH' ? 'JazzCash' : pkDepMethod === 'SADAPAY' ? 'SadaPay' : pkDepMethod === 'NAYAPAY' ? 'NayaPay' : 'Bank Transfer'} - Number: ${pkDepSenderNumber.trim()} | Name: ${pkDepSenderName.trim()}`;
         await onCreateDeposit(amtUSD, pkDepMethod, `${pkDepTxid.trim()} (${depositDetails})`, pkDepScreenshot);
         
+        console.log('Deposit submission successful.');
         setPkDepSuccess('✅ Your deposit request has been submitted successfully. It will be credited after verification within 2 minutes to 2 hours.');
         setPkDepAmount('');
         setPkDepSenderNumber('');
@@ -892,10 +894,12 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
         setPkDepTxid('');
         setPkDepScreenshot('');
       } else {
+        console.error('Deposit configuration missing.');
         setPkDepError('❌ Deposit system configuration issues. Please try again.');
       }
-    } catch (err) {
-      setPkDepError('❌ Could not save deposit request.');
+    } catch (err: any) {
+      console.error('Deposit submission error:', err);
+      setPkDepError(`❌ Could not save deposit request: ${err.message || 'Unknown error'}`);
     } finally {
       setSubmitting(false);
     }
@@ -3876,7 +3880,6 @@ const SUPPORTED_CURRENCIES: Record<CurrencyCode, { symbol: string; rate: number 
                     className="space-y-6"
                   >
                     {/* ... form content ... */}
-                  </form>
                   <ActivityHistory userId={userId} />
 
                     {/* Left Column: Input and Save Button */}
