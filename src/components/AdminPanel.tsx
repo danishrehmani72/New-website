@@ -1031,16 +1031,18 @@ export default function AdminPanel({
                           {d.status === 'pending' && (
                             <div className="flex justify-end gap-1.5">
                               <button 
-                                onClick={() => onUpdateTxStatus('deposit', d.id, 'approved', d.userId, d.amount)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                                onClick={() => handleTxAction('deposit', d.id, 'approved', d.userId, d.amount)}
+                                disabled={processingId === d.id}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
                               >
-                                Approve
+                                {processingId === d.id ? '...' : 'Approve'}
                               </button>
                               <button 
-                                onClick={() => onUpdateTxStatus('deposit', d.id, 'rejected', d.userId, d.amount)}
-                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                                onClick={() => handleTxAction('deposit', d.id, 'rejected', d.userId, d.amount)}
+                                disabled={processingId === d.id}
+                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
                               >
-                                Reject
+                                {processingId === d.id ? '...' : 'Reject'}
                               </button>
                             </div>
                           )}
@@ -1105,16 +1107,18 @@ export default function AdminPanel({
                           {w.status === 'pending' && (
                             <div className="flex justify-end gap-1.5">
                               <button 
-                                onClick={() => onUpdateTxStatus('withdrawal', w.id, 'approved', w.userId, w.amount)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                                onClick={() => handleTxAction('withdrawal', w.id, 'approved', w.userId, w.amount)}
+                                disabled={processingId === w.id}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
                               >
-                                Approve
+                                {processingId === w.id ? '...' : 'Approve'}
                               </button>
                               <button 
-                                onClick={() => onUpdateTxStatus('withdrawal', w.id, 'rejected', w.userId, w.amount)}
-                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
+                                onClick={() => handleTxAction('withdrawal', w.id, 'rejected', w.userId, w.amount)}
+                                disabled={processingId === w.id}
+                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-black font-black text-[9px] uppercase tracking-widest rounded-lg transition-all cursor-pointer"
                               >
-                                Reject
+                                {processingId === w.id ? '...' : 'Reject'}
                               </button>
                             </div>
                           )}

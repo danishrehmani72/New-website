@@ -28,6 +28,7 @@ import DashboardCard from './components/DashboardCard';
 import ReferralHistory from './components/ReferralHistory';
 import AdminPanel from './components/AdminPanel';
 import RecentWithdrawalToast, { RecentWithdrawalRecord } from './components/RecentWithdrawalToast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { useTranslation } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -2564,42 +2565,44 @@ export default function App() {
             </div>
           ) : (
             <div key="dashboard" id="dashboard-container" className="scroll-mt-24 w-full flex flex-col items-center gap-8">
-              <DashboardCard
-                name={userProfile.name}
-                userId={userProfile.userId}
-                balance={balance}
-                referralCount={logs.length}
-                logs={logs}
-                avatar={userProfile.avatar}
-                deposits={deposits}
-                withdrawals={withdrawals}
-                investments={investments}
-                dailyRewardLogs={dailyRewardLogs}
-                onCreateDeposit={handleCreateDeposit}
-                onCreateWithdrawal={handleCreateWithdrawal}
-                onCreatePlan={handleCreatePlan}
-                onCancelPlan={handleCancelPlan}
-                onUpdateTxStatus={async (type, txId, status) => {
-                  // DashboardCard does not support admin action with userId and amount, so we pass a no-op wrapper
-                }}
-                onSignOut={handleSignOut}
-                investmentProfits={investmentProfits}
-                maturedBalance={maturedBalance}
-                onAddToast={addToast}
-                userProfile={userProfile}
-                onClaimDailyReward={handleClaimDailyReward}
-                virtualDays={virtualDays}
-                activeTab={dashboardTab}
-                onActiveTabChange={setDashboardTab}
-                onUpdateProfile={handleUpdateProfile}
-                onVerifyEmail={handleVerifyEmail}
-                onRefresh={handleRefreshAllData}
-                globalSettings={globalSettings}
-                theme={theme}
-                setTheme={setTheme}
-                tasks={tasks}
-                taskSubmissions={taskSubmissions}
-              />
+              <ErrorBoundary>
+                <DashboardCard
+                  name={userProfile.name}
+                  userId={userProfile.userId}
+                  balance={balance}
+                  referralCount={logs.length}
+                  logs={logs}
+                  avatar={userProfile.avatar}
+                  deposits={deposits}
+                  withdrawals={withdrawals}
+                  investments={investments}
+                  dailyRewardLogs={dailyRewardLogs}
+                  onCreateDeposit={handleCreateDeposit}
+                  onCreateWithdrawal={handleCreateWithdrawal}
+                  onCreatePlan={handleCreatePlan}
+                  onCancelPlan={handleCancelPlan}
+                  onUpdateTxStatus={async (type, txId, status) => {
+                    // DashboardCard does not support admin action with userId and amount, so we pass a no-op wrapper
+                  }}
+                  onSignOut={handleSignOut}
+                  investmentProfits={investmentProfits}
+                  maturedBalance={maturedBalance}
+                  onAddToast={addToast}
+                  userProfile={userProfile}
+                  onClaimDailyReward={handleClaimDailyReward}
+                  virtualDays={virtualDays}
+                  activeTab={dashboardTab}
+                  onActiveTabChange={setDashboardTab}
+                  onUpdateProfile={handleUpdateProfile}
+                  onVerifyEmail={handleVerifyEmail}
+                  onRefresh={handleRefreshAllData}
+                  globalSettings={globalSettings}
+                  theme={theme}
+                  setTheme={setTheme}
+                  tasks={tasks}
+                  taskSubmissions={taskSubmissions}
+                />
+              </ErrorBoundary>
               <ReferralHistory logs={logs} userId={currentUid || ''} walletBalance={balance} theme={theme} />
             </div>
           )}
@@ -2822,18 +2825,20 @@ export default function App() {
 
               {/* Modal Core Area */}
               <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
-                <AdminPanel 
-                  onAddToast={addToast} 
-                  tasks={tasks}
-                  taskSubmissions={taskSubmissions}
-                  currentUserId={currentUid || 'anonymous-operator'} 
-                  isBypassed={isSuperAdminBypassed}
-                  onLockBypass={handleLockBypass}
-                  virtualDays={virtualDays}
-                  globalSettings={globalSettings}
-                  withdrawals={[...pendingFeedRaw, ...approvedFeedRaw]}
-                  onUpdateTxStatus={handleUpdateTxStatus}
-                />
+                <ErrorBoundary>
+                  <AdminPanel 
+                    onAddToast={addToast} 
+                    tasks={tasks}
+                    taskSubmissions={taskSubmissions}
+                    currentUserId={currentUid || 'anonymous-operator'} 
+                    isBypassed={isSuperAdminBypassed}
+                    onLockBypass={handleLockBypass}
+                    virtualDays={virtualDays}
+                    globalSettings={globalSettings}
+                    withdrawals={[...pendingFeedRaw, ...approvedFeedRaw]}
+                    onUpdateTxStatus={handleUpdateTxStatus}
+                  />
+                </ErrorBoundary>
               </div>
 
               {/* Admin Footer Banner info */}
